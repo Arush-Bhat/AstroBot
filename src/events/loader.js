@@ -13,15 +13,23 @@ export async function setupHandlers(client) {
   const eventFiles = readdirSync(eventsPath).filter(file => file.endsWith('.js') && file !== 'loader.js');
 
   for (const file of eventFiles) {
-    try {
-      const event = await import(`./${file}`);
-      const eventName = file.split('.')[0];
-      client.on(eventName, (...args) => event.default(...args, client));
-      console.log(`✅ Loaded event: ${eventName}`);
-    } catch (err) {
-      console.error(`❌ Failed to load event ${file}:`, err);
+  try {
+    const event = await import(`./${file}`);
+    console.log(`Loaded event module: ${file}`, event);
+
+    const eventName = file.split('.')[0];
+
+    if (typeof event.default !== 'function') {
+      console.error(`Event file ${file} does not export a default function!`);
+      continue;
     }
+
+    client.on(eventName, (...args) => event.default(...args, client));
+    console.log(`✅ Loaded event: ${eventName}`);
+  } catch (err) {
+    console.error(`❌ Failed to load event ${file}:`, err);
   }
+}
 
   // === Load Commands ===
   client.commands = new Map();
