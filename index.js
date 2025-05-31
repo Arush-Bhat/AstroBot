@@ -1,4 +1,13 @@
 import { EmbedBuilder, PermissionsBitField } from 'discord.js';
+import { Client, GatewayIntentBits } from 'discord.js';
+
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+});
+
+client.login(process.env.BOT_TOKEN).then(() => {
+  console.log('Bot logged in');
+}).catch(console.error);
 
 // Helpers to get and set channels in Supabase by guildId
 async function getModCh(guildId) {
