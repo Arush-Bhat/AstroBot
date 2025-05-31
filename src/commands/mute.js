@@ -11,13 +11,8 @@ const data = {
 async function execute(client, message, args, supabase) {
   const guild = message.guild;
   const member = message.member;
-
-  // Check if mod role is set and user has it (helper function can be used later)
-  // For now, assume mod role check is done here:
-
   const guildId = guild.id;
 
-  // Fetch mod and admin roles from Supabase
   const { data: settings, error } = await supabase
     .from('guild_settings')
     .select('mod_role_id, admin_role_id')
@@ -26,109 +21,101 @@ async function execute(client, message, args, supabase) {
 
   if (error) {
     console.error(error);
-    return message.reply({
-      embeds: [{ color: 0xff0000, description: '❌ Database error fetching roles.' }],
-    });
+    return {
+      reply: { embeds: [cmdErrorEmbed('Database Error', '❌ Database error fetching roles.')] },
+    };
   }
 
   const modRoleId = settings?.mod_role_id;
   const adminRoleId = settings?.admin_role_id;
 
   if (!modRoleId) {
-    return message.reply({
-      embeds: [{ color: 0xff0000, description: '❌ Mod role not set. Use `$setmod @role` first.' }],
-    });
+    return {
+      reply: { embeds: [cmdErrorEmbed('Missing Mod Role', '❌ Mod role not set. Use `$setmod @role` first.')] },
+    };
   }
 
-  // Check if user is mod or admin
   if (
     !member.roles.cache.has(modRoleId) &&
     !member.roles.cache.has(adminRoleId) &&
     !member.permissions.has('ADMINISTRATOR')
   ) {
-    return message.reply({
-      embeds: [{ color: 0xff0000, description: '❌ You do not have permission to mute users.' }],
-    });
+    return {
+      reply: { embeds: [cmdErrorEmbed('Permission Denied', '❌ You do not have permission to mute users.')] },
+    };
   }
 
   if (args.length < 1) {
-    return message.reply({
-      embeds: [{ color: 0xff0000, description: '❌ Please mention a user to mute.' }],
-    });
+    return {
+      reply: { embeds: [cmdErrorEmbed('Invalid Usage', '❌ Please mention a user to mute.')] },
+    };
   }
 
-  // Get target user from mention
   const target = message.mentions.members.first();
   if (!target) {
-    return message.reply({
-      embeds: [{ color: 0xff0000, description: '❌ Please mention a valid user.' }],
-    });
+    return {
+      reply: { embeds: [cmdErrorEmbed('Invalid User', '❌ Please mention a valid user.')] },
+    };
   }
 
-  // Check if target is server owner ("king")
   if (target.id === guild.ownerId) {
-    return message.reply({
-      embeds: [{ color: 0xff0000, description: '❌ Cannot mute the server owner.' }],
-    });
+    return {
+      reply: { embeds: [cmdErrorEmbed('Not Allowed', '❌ Cannot mute the server owner.')] },
+    };
   }
 
-  // Check that target is lower than command user in role hierarchy
-  if (target.roles.highest.position >= member.roles.highest.position && message.author.id !== guild.ownerId) {
-    return message.reply({
-      embeds: [{ color: 0xff0000, description: '❌ You cannot mute someone with equal or higher role.' }],
-    });
+  if (
+    target.roles.highest.position >= member.roles.highest.position &&
+    message.author.id !== guild.ownerId
+  ) {
+    return {
+      reply: { embeds: [cmdErrorEmbed('Not Allowed', '❌ You cannot mute someone with equal or higher role.')] },
+    };
   }
 
-  // Duration parsing - default 2 min
+  // Duration handling
   let durationMs = 2 * 60 * 1000;
   if (args[1]) {
-    const durationStr = args[1].toLowerCase();
-
-    // Match pattern: 1min, 2mins, 4hrs, 1hour etc
-    const match = durationStr.match(/^(\d+)(min|mins|hr|hrs|hour|hours)$/);
+    const match = args[1].toLowerCase().match(/^(\d+)(min|mins|hr|hrs|hour|hours)$/);
     if (!match) {
-      return message.reply({
-        embeds: [{ color: 0xff0000, description: '❌ Invalid duration format. Use e.g. 1min, 5mins, 2hrs.' }],
-      });
+      return {
+        reply: { embeds: [cmdErrorEmbed('Invalid Duration', '❌ Use formats like `2mins`, `1hour`, `3hrs`.')] },
+      };
     }
 
     const amount = parseInt(match[1]);
     const unit = match[2];
 
     if (amount < 1) {
-      return message.reply({
-        embeds: [{ color: 0xff0000, description: '❌ Duration must be at least 1 minute.' }],
-      });
+      return {
+        reply: { embeds: [cmdErrorEmbed('Invalid Duration', '❌ Duration must be at least 1 minute.')] },
+      };
     }
 
-    if (unit.startsWith('min')) {
-      durationMs = amount * 60 * 1000;
-    } else if (unit.startsWith('hr') || unit.startsWith('hour')) {
-      durationMs = amount * 60 * 60 * 1000;
-    }
+    durationMs = unit.startsWith('min')
+      ? amount * 60 * 1000
+      : amount * 60 * 60 * 1000;
 
     if (durationMs > 24 * 60 * 60 * 1000) {
-      return message.reply({
-        embeds: [{ color: 0xff0000, description: '❌ Maximum mute duration is 24 hours.' }],
-      });
+      return {
+        reply: { embeds: [cmdErrorEmbed('Too Long', '❌ Maximum mute duration is 24 hours.')] },
+      };
     }
   }
 
-  // Find or create Muted role
+  // Get or create muted role
   let mutedRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'muted');
-
   if (!mutedRole) {
     try {
       mutedRole = await guild.roles.create({
         name: 'Muted',
         color: 'GRAY',
-        reason: 'Muted role needed for muting users',
+        reason: 'Muted role created for moderation.',
         permissions: [],
       });
 
-      // Deny send messages and add other permission denies in all text channels
       for (const [, channel] of guild.channels.cache) {
-        if (channel.isText()) {
+        if (channel.isTextBased?.()) {
           await channel.permissionOverwrites.edit(mutedRole, {
             SendMessages: false,
             AddReactions: false,
@@ -138,54 +125,63 @@ async function execute(client, message, args, supabase) {
       }
     } catch (err) {
       console.error(err);
-      return message.reply({
-        embeds: [{ color: 0xff0000, description: '❌ Failed to create Muted role.' }],
-      });
+      return {
+        reply: { embeds: [cmdErrorEmbed('Error', '❌ Failed to create Muted role.')] },
+      };
     }
   }
 
   if (target.roles.cache.has(mutedRole.id)) {
-    return message.reply({
-      embeds: [{ color: 0xff0000, description: '❌ User is already muted.' }],
-    });
+    return {
+      reply: { embeds: [cmdErrorEmbed('Already Muted', '❌ User is already muted.')] },
+    };
   }
 
   try {
     await target.roles.add(mutedRole, `Muted by ${message.author.tag} for ${durationMs / 60000} minutes.`);
   } catch (err) {
     console.error(err);
-    return message.reply({
-      embeds: [{ color: 0xff0000, description: '❌ Failed to assign Muted role.' }],
-    });
+    return {
+      reply: { embeds: [cmdErrorEmbed('Error', '❌ Failed to assign Muted role.')] },
+    };
   }
 
-  message.reply({
-    embeds: [{
-      color: 0x00ff00,
-      description: `🔇 Muted ${target.user.tag} for ${durationMs / 60000} minutes.`,
-    }],
-  });
-
-  return {
-  reason: `Muted ${target.user.tag} for ${durationMs / 60000} minutes.`,
-    targetUserId: target.id,
-  };
-
-  // Remove mute after duration
   setTimeout(async () => {
     try {
-      if (target.roles.cache.has(mutedRole.id)) {
-        await target.roles.remove(mutedRole, 'Mute duration expired.');
-        // Optional: Send DM or message that mute expired
+      const refreshedTarget = await guild.members.fetch(target.id).catch(() => null);
+      if (refreshedTarget && refreshedTarget.roles.cache.has(mutedRole.id)) {
+        await refreshedTarget.roles.remove(mutedRole, 'Mute duration expired.');
       }
     } catch (err) {
       console.error('Error removing mute role:', err);
     }
   }, durationMs);
-};
+
+  return {
+    reply: {
+      embeds: [
+        cmdResponseEmbed(
+          'User Muted',
+          `🔇 Muted ${target.user.tag} for ${durationMs / 60000} minutes.`,
+          'Yellow'
+        ),
+      ],
+    },
+    log: {
+      action: 'mute',
+      executorUserId: message.author.id,
+      executorTag: message.author.tag,
+      targetUserId: target.id,
+      targetTag: target.user.tag,
+      duration: `${durationMs / 60000}m`,
+      guildId,
+      timestamp: new Date().toISOString(),
+    },
+  };
+}
 
 export default {
-  permissionLevel,
   data,
+  permissionLevel,
   execute,
 };

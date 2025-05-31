@@ -99,10 +99,10 @@ async function execute(client, message, args, supabase) {
       reply: { embeds: [cmdErrorEmbed('Error', '❌ Failed to kick the user. Check bot permissions.')] },
     };
   }
-};
+}
 
 export default {
-  permissionLevel,
   data,
+  permissionLevel,
   execute,
 };

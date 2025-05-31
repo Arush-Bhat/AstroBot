@@ -36,15 +36,20 @@ export async function setupHandlers(client) {
   const commandsPath = path.join(__dirname, '..', 'commands');
   const commandFiles = readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-  for (const file of commandFiles) {
-    try {
-      const command = await import(`../commands/${file}`);
-      client.commands.set(command.default.name, command.default);
-      console.log(`📦 Loaded command: ${command.default.name}`);
-    } catch (err) {
-      console.error(`❌ Failed to load command ${file}:`, err);
+    for (const file of commandFiles) {
+        try {
+            const command = await import(`../commands/${file}`);
+            const commandName = command.default.data?.name;
+            if (!commandName) {
+                console.warn(`⚠️ Command file ${file} is missing 'data.name'`);
+                continue;
+            }
+            client.commands.set(commandName, command.default);
+            console.log(`📦 Loaded command: ${commandName}`);
+        } catch (err) {
+            console.error(`❌ Failed to load command ${file}:`, err);
+        }   
     }
-  }
 
   // === Setup messageCreate listener for prefix commands ===
   client.on('messageCreate', async message => {

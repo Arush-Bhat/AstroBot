@@ -1,101 +1,149 @@
-import supabase from '../supabaseClient.js';
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
-import { isModerator, canManageRole } from '../utils/permissions.js';
+import { isModerator } from '../utils/permissions.js';
 
 const permissionLevel = 'Mod';
 
 const data = {
-  name: 'yt', 
+  name: 'yt',
+  description: 'Set YouTube updates channel or subscribe to YouTube channel URLs.',
+  usage: '$yt #channel OR $yt <YouTube URL>',
 };
 
-async function execute(message, args) {
-  if (!await isModerator(message.member)) {
-    return message.reply({
-      embeds: [cmdErrorEmbed('Unauthorized', 'Only moderators can use this command.')],
-    });
+async function execute(client, message, args, supabase) {
+  const member = message.member;
+
+  // Check permission using your helper
+  if (!(await isModerator(member, supabase))) {
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('Unauthorized', 'Only moderators can use this command.')],
+      },
+    };
   }
 
   if (!args.length) {
-    return message.reply({
-      embeds: [cmdErrorEmbed('Usage', 'Use:\n• `$yt #channel` to set the updates channel\n• `$yt <YouTube URL>` to subscribe to a YouTube channel')],
-    });
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Usage',
+            'Use:\n• `$yt #channel` to set the updates channel\n• `$yt <YouTube URL>` to subscribe to a YouTube channel'
+          ),
+        ],
+      },
+    };
   }
 
+  // Check if a channel was mentioned
   const channelMention = message.mentions.channels.first();
+
+  // Regex for YouTube channel URLs (c/, @, channel/)
   const ytUrlPattern = /^https?:\/\/(www\.)?youtube\.com\/(c\/|@|channel\/)?[a-zA-Z0-9_\-]+/i;
 
-  // Set YouTube updates channel
   if (channelMention) {
+    // Set updates channel in database
     const { error } = await supabase
       .from('yt_settings')
-      .upsert({
-        guild_id: message.guild.id,
-        updates_channel_id: channelMention.id,
-      }, { onConflict: ['guild_id'] });
+      .upsert(
+        {
+          guild_id: message.guild.id,
+          updates_channel_id: channelMention.id,
+        },
+        { onConflict: ['guild_id'] }
+      );
 
     if (error) {
       console.error(error);
-      return message.reply({
-        embeds: [cmdErrorEmbed('Database Error', 'Failed to set updates channel. Please try again later.')],
-      });
+      return {
+        reply: {
+          embeds: [cmdErrorEmbed('Database Error', 'Failed to set updates channel. Please try again later.')],
+        },
+      };
     }
 
-    return message.reply({
-      embeds: [cmdResponseEmbed('YouTube Updates Channel Set', `Updates will be posted in ${channelMention}`)],
-    });
+    return {
+      reply: {
+        embeds: [cmdResponseEmbed('YouTube Updates Channel Set', `Updates will be posted in ${channelMention}`)],
+      },
+      log: {
+        action: 'yt_updates_channel_set',
+        executorUserId: message.author.id,
+        executorTag: message.author.tag,
+        guildId: message.guild.id,
+        channelId: channelMention.id,
+        timestamp: new Date().toISOString(),
+      },
+    };
   }
 
-  // Register YouTube channel URL to track
+  // If argument matches a YouTube channel URL, subscribe to it
   if (ytUrlPattern.test(args[0])) {
-    // Check if updates channel is set
-    const { data: ytSetting } = await supabase
+    // Ensure updates channel is set
+    const { data: ytSetting, error: ytSettingError } = await supabase
       .from('yt_settings')
       .select('updates_channel_id')
       .eq('guild_id', message.guild.id)
       .single();
 
-    if (!ytSetting || !ytSetting.updates_channel_id) {
-      return message.reply({
-        embeds: [cmdErrorEmbed('Missing Update Channel', 'Please set an updates channel first using `$yt #channel`.')],
-      });
+    if (ytSettingError || !ytSetting || !ytSetting.updates_channel_id) {
+      return {
+        reply: {
+          embeds: [cmdErrorEmbed('Missing Update Channel', 'Please set an updates channel first using `$yt #channel`.')],
+        },
+      };
     }
 
     const url = args[0];
 
     const { error } = await supabase
       .from('yt_channels')
-      .upsert({
-        guild_id: message.guild.id,
-        url: url,
-      }, { onConflict: ['guild_id'] });
+      .upsert(
+        {
+          guild_id: message.guild.id,
+          url,
+        },
+        { onConflict: ['guild_id', 'url'] }
+      );
 
     if (error) {
       console.error(error);
-      return message.reply({
-        embeds: [cmdErrorEmbed('Database Error', 'Failed to save YouTube channel. Please try again later.')],
-      });
+      return {
+        reply: {
+          embeds: [cmdErrorEmbed('Database Error', 'Failed to save YouTube channel. Please try again later.')],
+        },
+      };
     }
 
-    // --- You would implement a background job or webhook handler elsewhere ---
-    // Example: periodically check these URLs for new uploads
-    // When a new video is detected, send a message in ytSetting.updates_channel_id
-    // You can add a helper function elsewhere that:
-    // 1) Queries supabase yt_channels for URLs,
-    // 2) Checks YouTube API for new videos,
-    // 3) Sends embed messages to the update channel with video info
-
-    return message.reply({
-      embeds: [cmdResponseEmbed('YouTube Channel Subscribed', `Now tracking: ${url}`)],
-    });
+    return {
+      reply: {
+        embeds: [cmdResponseEmbed('YouTube Channel Subscribed', `Now tracking: ${url}`)],
+      },
+      log: {
+        action: 'yt_channel_subscribed',
+        executorUserId: message.author.id,
+        executorTag: message.author.tag,
+        guildId: message.guild.id,
+        url,
+        timestamp: new Date().toISOString(),
+      },
+    };
   }
 
-  return message.reply({
-    embeds: [cmdErrorEmbed('Invalid Argument', 'Please provide either a YouTube channel URL or tag a text channel.')],
-  });
-};
+  // If none matched, invalid argument
+  return {
+    reply: {
+      embeds: [
+        cmdErrorEmbed(
+          'Invalid Argument',
+          'Please provide either a YouTube channel URL or tag a text channel.'
+        ),
+      ],
+    },
+  };
+}
 
 export default {
-  permissionLevel,
   data,
+  permissionLevel,
   execute,
 };

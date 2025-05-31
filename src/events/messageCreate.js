@@ -73,7 +73,8 @@ export default async function messageCreate(message, client) {
 
   try {
     // Execute the command
-    await command.execute(message, args);
+    await command.execute(client, message, args, supabase);
+
 
     // Prepare log info for modlog
     let reason = null;

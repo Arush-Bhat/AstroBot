@@ -5,17 +5,25 @@ const permissionLevel = 'Mod';
 
 const data = {
   name: 'role',
-  description: 'Assign a role to a user',
+  description: 'Assign a role to a user. Requires Manage Roles permission.',
   usage: '$role @user @role',
 };
 
-async function execute(message, args) {
+async function execute(client, message, args, supabase) {
   if (!message.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
-    return message.channel.send({ embeds: [cmdErrorEmbed('❌ Unauthorized', 'You need the Manage Roles permission to use this command.')] });
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('❌ Unauthorized', 'You need the **Manage Roles** permission to use this command.')],
+      },
+    };
   }
 
   if (args.length < 2) {
-    return message.channel.send({ embeds: [cmdWarningEmbed('❌ Invalid Usage', 'Usage: $role @user @role')] });
+    return {
+      reply: {
+        embeds: [cmdWarningEmbed('❌ Invalid Usage', 'Usage: `$role @user @role`')],
+      },
+    };
   }
 
   const userMention = args[0];
@@ -28,55 +36,85 @@ async function execute(message, args) {
   const role = message.guild.roles.cache.get(roleId);
 
   if (!member) {
-    return message.channel.send({ embeds: [cmdErrorEmbed('❌ Invalid User', 'Please mention a valid user.')] });
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('❌ Invalid User', 'Please mention a valid user.')],
+      },
+    };
   }
 
   if (!role) {
-    return message.channel.send({ embeds: [cmdErrorEmbed('❌ Invalid Role', 'Please mention a valid role.')] });
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('❌ Invalid Role', 'Please mention a valid role.')],
+      },
+    };
   }
 
   if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
-    return message.channel.send({ embeds: [cmdErrorEmbed('❌ Missing Permission', 'I need Manage Roles permission to do that.')] });
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('❌ Missing Permission', 'I need the **Manage Roles** permission to do that.')],
+      },
+    };
   }
 
-  // Check role hierarchy (bot)
-  const botHighestRole = message.guild.members.me.roles.highest;
-  if (role.position >= botHighestRole.position) {
-    return message.channel.send({ embeds: [cmdErrorEmbed('❌ Role Hierarchy Error', 'I cannot manage a role higher or equal to my highest role.')] });
+  const botHighest = message.guild.members.me.roles.highest;
+  if (role.position >= botHighest.position) {
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('❌ Role Hierarchy Error', 'I cannot manage a role higher or equal to my highest role.')],
+      },
+    };
   }
 
-  // Check role hierarchy (author)
-  const authorHighestRole = message.member.roles.highest;
-  if (role.position >= authorHighestRole.position) {
-    return message.channel.send({ embeds: [cmdErrorEmbed('❌ Role Hierarchy Error', 'You cannot manage a role higher or equal to your highest role.')] });
+  const authorHighest = message.member.roles.highest;
+  if (role.position >= authorHighest.position) {
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('❌ Role Hierarchy Error', 'You cannot assign a role higher or equal to your highest role.')],
+      },
+    };
   }
 
   try {
     if (member.roles.cache.has(role.id)) {
-      return message.channel.send({ embeds: [cmdWarningEmbed('ℹ️ Role Already Assigned', `${member.user.tag} already has the role ${role.name}.`)] });
+      return {
+        reply: {
+          embeds: [cmdWarningEmbed('ℹ️ Role Already Assigned', `${member.user.tag} already has the role **${role.name}**.`)],
+        },
+      };
     }
 
     await member.roles.add(role);
-    await message.channel.send({ embeds: [cmdResponseEmbed('✅ Role Added', `Added role ${role.name} to ${member.user.tag}.`)] });
 
-    // Return log info
     return {
-      action: 'assignRole',
-      targetUserId: member.id,
-      targetUserTag: member.user.tag,
-      roleId: role.id,
-      roleName: role.name,
-      moderatorId: message.author.id,
-      moderatorTag: message.author.tag,
+      reply: {
+        embeds: [cmdResponseEmbed('✅ Role Added', `Added role **${role.name}** to ${member.user.tag}.`)],
+      },
+      log: {
+        action: 'assignRole',
+        targetUserId: member.id,
+        targetUserTag: member.user.tag,
+        roleId: role.id,
+        roleName: role.name,
+        moderatorId: message.author.id,
+        moderatorTag: message.author.tag,
+        timestamp: new Date().toISOString(),
+      },
     };
   } catch (error) {
     console.error('Error adding role:', error);
-    await message.channel.send({ embeds: [cmdErrorEmbed('❌ Error', 'There was an error adding the role. Check my permissions and role hierarchy.')] });
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('❌ Error', 'There was an error adding the role. Check my permissions and role hierarchy.')],
+      },
+    };
   }
-};
+}
 
 export default {
-  permissionLevel,
   data,
+  permissionLevel,
   execute,
 };

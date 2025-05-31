@@ -14,29 +14,41 @@ async function execute(client, message, args, supabase) {
   const guild = message.guild;
   const member = message.member;
 
+  // Get the mentioned user to ban
   const target = message.mentions.members.first();
-  const reasonMatch = message.content.match(/reason\(([^)]+)\)/i);
-  const reason = reasonMatch ? reasonMatch[1].trim() : 'No reason provided';
-
   if (!target) {
-    return message.reply({ embeds: [cmdErrorEmbed('Please mention a valid user to ban.')] });
+    return {
+      reply: { embeds: [cmdErrorEmbed('Please mention a valid user to ban.')] },
+    };
   }
 
+  // Check if target is server owner
   if (target.id === guild.ownerId) {
-    return message.reply({ embeds: [cmdErrorEmbed('Cannot ban the server owner.')] });
+    return {
+      reply: { embeds: [cmdErrorEmbed('Cannot ban the server owner.')] },
+    };
   }
 
+  // Check role hierarchy: target must be lower than command user or author is owner
   if (
     target.roles.highest.position >= member.roles.highest.position &&
     message.author.id !== guild.ownerId
   ) {
-    return message.reply({ embeds: [cmdErrorEmbed('You cannot ban someone with equal or higher role.')] });
+    return {
+      reply: { embeds: [cmdErrorEmbed('You cannot ban someone with equal or higher role.')] },
+    };
   }
+
+  // Extract reason: everything after the mention, fallback default
+  const mentionIndex = message.content.indexOf('>');
+  const reason = mentionIndex !== -1
+    ? message.content.slice(mentionIndex + 1).trim() || 'No reason provided'
+    : 'No reason provided';
 
   try {
     await target.ban({ reason: `Banned by ${message.author.tag}: ${reason}` });
 
-    // Log to Supabase
+    // Log to Supabase banned_users table
     const { error } = await supabase
       .from('banned_users')
       .upsert({
@@ -44,30 +56,40 @@ async function execute(client, message, args, supabase) {
         user_id: target.id,
         reason,
         banned_by: message.author.id,
+        banned_at: new Date().toISOString(),
       });
 
     if (error) {
       console.error('Supabase logging error:', error);
+      // Optionally notify about log failure but do not block ban success
     }
 
-    // Feedback
-    await message.reply({
-      embeds: [cmdResponseEmbed(`🔨 **${target.user.tag}** was banned.\n**Reason:** ${reason}`)],
-    });
-
-    // Return info for centralized log
+    // Send success reply
     return {
-      targetUserId: target.id,
-      reason,
+      reply: {
+        embeds: [cmdResponseEmbed(`🔨 **${target.user.tag}** was banned.\n**Reason:** ${reason}`)],
+      },
+      log: {
+        action: 'ban',
+        targetUserId: target.id,
+        targetTag: target.user.tag,
+        executorUserId: message.author.id,
+        executorTag: message.author.tag,
+        guildId: guild.id,
+        reason,
+        timestamp: new Date().toISOString(),
+      },
     };
   } catch (err) {
     console.error('Ban failed:', err);
-    return message.reply({ embeds: [cmdErrorEmbed('Failed to ban the user. Check bot permissions.')] });
+    return {
+      reply: { embeds: [cmdErrorEmbed('Failed to ban the user. Check bot permissions.')] },
+    };
   }
 };
 
 export default {
-  permissionLevel,
   data,
+  permissionLevel,
   execute,
 };

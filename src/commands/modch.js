@@ -4,7 +4,8 @@ const permissionLevel = 'Admin';
 
 const data = {
   name: 'modch',
-  description: 'Set or get the moderator commands channel. Administrator-level command.',
+  description: 'Set or view the mod commands channel. Admin-only command.',
+  usage: '$modch #channel',
 };
 
 async function execute(client, message, args, supabase) {
@@ -39,7 +40,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Fetch modch channel
+  // Fetch current modch channel
   const { data: settingsData, error: settingsError } = await supabase
     .from('guild_settings')
     .select('modch_channel_id')
@@ -56,6 +57,7 @@ async function execute(client, message, args, supabase) {
   const modchId = settingsData?.modch_channel_id;
   const modchChannel = modchId ? message.guild.channels.cache.get(modchId) : null;
 
+  // If no arguments: show current modch channel
   if (args.length === 0) {
     return {
       reply: {
@@ -70,11 +72,14 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Parse new channel
   const channelMention = args[0];
   const channelIdMatch = channelMention.match(/^<#(\d+)>$/);
   if (!channelIdMatch) {
     return {
-      reply: { embeds: [cmdErrorEmbed('Invalid Channel', 'Please mention a valid channel. Usage: `$modch #channel`.')] },
+      reply: {
+        embeds: [cmdErrorEmbed('Invalid Channel', 'Please mention a valid channel. Usage: `$modch #channel`.')],
+      },
     };
   }
 
@@ -83,7 +88,9 @@ async function execute(client, message, args, supabase) {
 
   if (!channel) {
     return {
-      reply: { embeds: [cmdErrorEmbed('Invalid Channel', 'The specified channel does not exist in this server.')] },
+      reply: {
+        embeds: [cmdErrorEmbed('Invalid Channel', 'The specified channel does not exist in this server.')],
+      },
     };
   }
 
@@ -97,7 +104,9 @@ async function execute(client, message, args, supabase) {
   if (fetchError && fetchError.code !== 'PGRST116') {
     console.error(fetchError);
     return {
-      reply: { embeds: [cmdErrorEmbed('Database Error', 'Error while fetching guild settings.')] },
+      reply: {
+        embeds: [cmdErrorEmbed('Database Error', 'Error while fetching guild settings.')],
+      },
     };
   }
 
@@ -110,7 +119,9 @@ async function execute(client, message, args, supabase) {
     if (updateError) {
       console.error(updateError);
       return {
-        reply: { embeds: [cmdErrorEmbed('Database Error', 'Failed to update mod commands channel.')] },
+        reply: {
+          embeds: [cmdErrorEmbed('Database Error', 'Failed to update mod commands channel.')],
+        },
       };
     }
   } else {
@@ -121,7 +132,9 @@ async function execute(client, message, args, supabase) {
     if (insertError) {
       console.error(insertError);
       return {
-        reply: { embeds: [cmdErrorEmbed('Database Error', 'Failed to insert mod commands channel.')] },
+        reply: {
+          embeds: [cmdErrorEmbed('Database Error', 'Failed to insert mod commands channel.')],
+        },
       };
     }
   }
@@ -149,7 +162,7 @@ async function execute(client, message, args, supabase) {
 };
 
 export default {
-  permissionLevel,
   data,
+  permissionLevel,
   execute,
 };

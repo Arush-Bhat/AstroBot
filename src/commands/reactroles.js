@@ -10,7 +10,7 @@ const data = {
   usage: '$reactroles #channel msg("Text") roles((emoji:@role), ...) config(toggle=true/false)',
 };
 
-async function execute(message, args) {
+async function execute(client, message, args, supabase) {
   const { data: config } = await supabase
     .from('config')
     .select('mod_role_id, admin_role_id')
@@ -18,26 +18,40 @@ async function execute(message, args) {
     .single();
 
   if (!config) {
-    return message.reply({
-      embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Server is not configured. Use `$setup` first.')],
-    });
+    return {
+      reply: {
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setDescription('❌ Server is not configured. Use `$setup` first.'),
+        ],
+      },
+    };
   }
 
   const isMod = isModerator(message.member, config.mod_role_id, config.admin_role_id);
   if (!isMod) {
-    return message.reply({
-      embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ You do not have permission to use this command.')],
-    });
+    return {
+      reply: {
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setDescription('❌ You do not have permission to use this command.'),
+        ],
+      },
+    };
   }
 
   if (args.length < 3) {
-    return message.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor('Red')
-          .setDescription('❌ Invalid command syntax.'),
-      ],
-    });
+    return {
+      reply: {
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setDescription('❌ Invalid command syntax.'),
+        ],
+      },
+    };
   }
 
   // Helper to parse quoted content inside parentheses, e.g. msg("text")
@@ -71,48 +85,69 @@ async function execute(message, args) {
   const channelMention = args[0];
   const channelId = channelMention.replace(/[<#>]/g, '');
   const channel = await message.guild.channels.fetch(channelId).catch(() => null);
-  if (!channel || !channel.isText()) {
-    return message.reply({
-      embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Invalid channel mention or not a text channel.')],
-    });
+
+  if (!channel || !channel.isTextBased()) {
+    return {
+      reply: {
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setDescription('❌ Invalid channel mention or not a text channel.'),
+        ],
+      },
+    };
   }
 
-  // Join rest of args for parsing msg(), roles(), config()
+  // Join remaining args for parsing
   const argsStr = args.slice(1).join(' ');
 
-  // Parse message text
   const messageText = parseParenArg(argsStr, 'msg');
   if (!messageText) {
-    return message.reply({
-      embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Missing or invalid msg(). Use msg("Your text")')],
-    });
+    return {
+      reply: {
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setDescription('❌ Missing or invalid msg(). Use msg("Your text")'),
+        ],
+      },
+    };
   }
 
-  // Parse roles mapping
   const roleMappingsRaw = parseRoles(argsStr);
   if (Object.keys(roleMappingsRaw).length === 0) {
-    return message.reply({
-      embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ You must specify at least one role mapping. Use roles((emoji:@role), ...)')],
-    });
+    return {
+      reply: {
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setDescription('❌ You must specify at least one role mapping. Use roles((emoji:@role), ...)'),
+        ],
+      },
+    };
   }
 
-  // Convert role mentions to IDs and validate
   const mappings = {};
   for (const [emoji, roleMention] of Object.entries(roleMappingsRaw)) {
     const roleId = roleMention.replace(/[<@&>]/g, '');
     const role = message.guild.roles.cache.get(roleId);
     if (!role) {
-      return message.reply({
-        embeds: [new EmbedBuilder().setColor('Red').setDescription(`❌ Invalid role mention: ${roleMention}`)],
-      });
+      return {
+        reply: {
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setDescription(`❌ Invalid role mention: ${roleMention}`),
+          ],
+        },
+      };
     }
     mappings[emoji] = role.id;
   }
 
-  // Parse toggle config (default false)
   const togglable = parseConfig(argsStr);
 
-  // Send the reaction role message
+  // Send the message
   const post = await channel.send(messageText);
 
   for (const emoji of Object.keys(mappings)) {
@@ -123,7 +158,6 @@ async function execute(message, args) {
     }
   }
 
-  // Save to Supabase
   const { error } = await supabase.from('reaction_roles').insert({
     guild_id: message.guild.id,
     channel_id: channel.id,
@@ -134,23 +168,32 @@ async function execute(message, args) {
 
   if (error) {
     console.error('Failed to save reaction role message:', error);
-    return message.reply('❌ Failed to save reaction role message. Please try again.');
+    return {
+      reply: {
+        content: '❌ Failed to save reaction role message. Please try again.',
+      },
+    };
   }
 
-  await message.reply('✅ Reaction role message successfully created and saved!');
-
   return {
-    action: 'createReactRole',
-    channelId: channel.id,
-    messageId: post.id,
-    mappings,
-    togglable,
-    createdBy: message.author.id,
+    reply: {
+      content: '✅ Reaction role message successfully created and saved!',
+    },
+    log: {
+      action: 'reactionrole_created',
+      guildId: message.guild.id,
+      createdBy: message.author.id,
+      channelId: channel.id,
+      messageId: post.id,
+      mappings,
+      togglable,
+      timestamp: new Date().toISOString(),
+    },
   };
-};
+}
 
 export default {
-  permissionLevel,
   data,
+  permissionLevel,
   execute,
 };

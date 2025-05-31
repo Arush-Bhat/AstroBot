@@ -5,21 +5,28 @@ const permissionLevel = 'Admin';
 
 const data = {
   name: 'setadmin',
-  description: 'Set the administrator role',
+  description: 'Sets the Administrator role for the server.',
+  usage: '$setadmin @role',
 };
 
-async function execute(message, args) {
-  if (!message.member.permissions.has('Administrator')) {
-    return message.channel.send({
-      embeds: [cmdErrorEmbed('❌ Permission Denied', 'You need Administrator permission to set the admin role.')]
-    });
+async function execute(client, message, args, supabase) {
+  const member = message.member;
+
+  if (!member.permissions.has('Administrator')) {
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('❌ Permission Denied', 'You need Administrator permission to set the admin role.')],
+      },
+    };
   }
 
   const role = message.mentions.roles.first();
   if (!role) {
-    return message.channel.send({
-      embeds: [cmdErrorEmbed('❌ Invalid Role', 'Please mention a valid role. Usage: `$setadmin @role`')]
-    });
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('❌ Invalid Role', 'Please mention a valid role. Usage: `$setadmin @role`')],
+      },
+    };
   }
 
   const guildId = message.guild.id;
@@ -31,26 +38,33 @@ async function execute(message, args) {
 
   if (error) {
     console.error(error);
-    return message.channel.send({
-      embeds: [cmdErrorEmbed('❌ Database Error', 'Failed to save the admin role. Please try again later.')]
-    });
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('❌ Database Error', 'Failed to save the admin role. Please try again later.')],
+      },
+    };
   }
 
-  message.channel.send({
-    embeds: [cmdResponseEmbed('✅ Administrator Role Set', `Administrator role has been set to ${role.name}.`)]
-  });
-
   return {
-    action: 'setAdminRole',
-    roleId: role.id,
-    roleName: role.name,
-    moderatorId: message.author.id,
-    moderatorTag: message.author.tag,
+    reply: {
+      embeds: [
+        cmdResponseEmbed('✅ Administrator Role Set', `Administrator role has been set to ${role.toString()}.`, 'Green'),
+      ],
+    },
+    log: {
+      action: 'set_admin_role',
+      executorUserId: message.author.id,
+      executorTag: message.author.tag,
+      guildId,
+      roleId: role.id,
+      roleName: role.name,
+      timestamp: new Date().toISOString(),
+    },
   };
-};
+}
 
 export default {
-  permissionLevel,
   data,
+  permissionLevel,
   execute,
 };

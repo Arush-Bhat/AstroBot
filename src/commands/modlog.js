@@ -4,8 +4,8 @@ const permissionLevel = 'Admin';
 
 const data = {
   name: 'modlog',
-  description: 'Set or get the moderator log channel. Administrator-level command.',
-
+  description: 'Set or view the moderator log channel. Admin-only command.',
+  usage: '$modlog #channel',
 };
 
 async function execute(client, message, args, supabase) {
@@ -22,7 +22,7 @@ async function execute(client, message, args, supabase) {
   if (adminError) {
     console.error(adminError);
     return {
-      reply: await cmdErrorEmbed(message, 'Error fetching admin role from database.'),
+      reply: { embeds: [cmdErrorEmbed('Error', 'Error fetching admin role from database.')] },
     };
   }
 
@@ -30,16 +30,17 @@ async function execute(client, message, args, supabase) {
 
   if (!adminRoleId) {
     return {
-      reply: await cmdErrorEmbed(message, 'Use `$setadmin @role` first.'),
+      reply: { embeds: [cmdErrorEmbed('Missing Admin Role', 'Use `$setadmin @role` first.')] },
     };
   }
 
   if (!member.roles.cache.has(adminRoleId) && !member.permissions.has('ADMINISTRATOR')) {
     return {
-      reply: await cmdErrorEmbed(message, 'Administrator role required.'),
+      reply: { embeds: [cmdErrorEmbed('Unauthorized', 'Administrator role required.')] },
     };
   }
 
+  // View current modlog channel
   if (args.length === 0) {
     const { data, error } = await supabase
       .from('guild_settings')
@@ -50,7 +51,7 @@ async function execute(client, message, args, supabase) {
     if (error) {
       console.error(error);
       return {
-        reply: await cmdErrorEmbed(message, 'Error fetching modlog channel from database.'),
+        reply: { embeds: [cmdErrorEmbed('Error', 'Error fetching modlog channel from database.')] },
       };
     }
 
@@ -58,19 +59,24 @@ async function execute(client, message, args, supabase) {
     const modlogChannel = modlogId ? message.guild.channels.cache.get(modlogId) : null;
 
     return {
-      reply: await cmdResponseEmbed(
-        message,
-        `📝 Moderator log channel is: ${modlogChannel ? modlogChannel.toString() : 'N/A'}`
-      ),
+      reply: {
+        embeds: [
+          cmdResponseEmbed(
+            'Moderator Log Channel',
+            `📝 Moderator log channel is: ${modlogChannel ? modlogChannel.toString() : 'N/A'}`,
+            'Green'
+          ),
+        ],
+      },
     };
   }
 
-  // Channel mention validation
+  // Validate channel mention
   const channelMention = args[0];
   const channelIdMatch = channelMention.match(/^<#(\d+)>$/);
   if (!channelIdMatch) {
     return {
-      reply: await cmdErrorEmbed(message, 'Please mention a valid channel. Usage: `$modlog #channel`.'),
+      reply: { embeds: [cmdErrorEmbed('Invalid Channel', 'Please mention a valid channel. Usage: `$modlog #channel`.')] },
     };
   }
 
@@ -79,11 +85,11 @@ async function execute(client, message, args, supabase) {
 
   if (!channel) {
     return {
-      reply: await cmdErrorEmbed(message, 'The specified channel does not exist in this server.'),
+      reply: { embeds: [cmdErrorEmbed('Invalid Channel', 'The specified channel does not exist in this server.')] },
     };
   }
 
-  // Upsert modlog_channel_id in database
+  // Upsert modlog_channel_id
   const { data: existing, error: fetchError } = await supabase
     .from('guild_settings')
     .select('guild_id')
@@ -93,7 +99,7 @@ async function execute(client, message, args, supabase) {
   if (fetchError && fetchError.code !== 'PGRST116') {
     console.error(fetchError);
     return {
-      reply: await cmdErrorEmbed(message, 'Error while fetching guild settings.'),
+      reply: { embeds: [cmdErrorEmbed('Database Error', 'Error while fetching guild settings.')] },
     };
   }
 
@@ -106,7 +112,7 @@ async function execute(client, message, args, supabase) {
     if (updateError) {
       console.error(updateError);
       return {
-        reply: await cmdErrorEmbed(message, 'Failed to update modlog channel.'),
+        reply: { embeds: [cmdErrorEmbed('Database Error', 'Failed to update modlog channel.')] },
       };
     }
   } else {
@@ -117,13 +123,21 @@ async function execute(client, message, args, supabase) {
     if (insertError) {
       console.error(insertError);
       return {
-        reply: await cmdErrorEmbed(message, 'Failed to insert modlog channel.'),
+        reply: { embeds: [cmdErrorEmbed('Database Error', 'Failed to insert modlog channel.')] },
       };
     }
   }
 
   return {
-    reply: await cmdResponseEmbed(message, `✅ Moderator log channel set to ${channel.toString()}`),
+    reply: {
+      embeds: [
+        cmdResponseEmbed(
+          'Mod Log Channel Set',
+          `✅ Moderator log channel set to ${channel.toString()}`,
+          'Green'
+        ),
+      ],
+    },
     log: {
       action: 'modlog_set',
       executorUserId: message.author.id,
@@ -134,10 +148,10 @@ async function execute(client, message, args, supabase) {
       timestamp: new Date().toISOString(),
     },
   };
-};
+}
 
 export default {
-  permissionLevel,
   data,
+  permissionLevel,
   execute,
 };
