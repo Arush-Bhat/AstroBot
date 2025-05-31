@@ -1,8 +1,8 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const supabase = require('../supabaseClient');
-const { isModerator } = require('../utils/permissions');
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import supabase from './src/supabaseClient'
+import { isModerator } from '../utils/permissions';
 
-module.exports = {
+export default {
   name: 'poll',
   async execute(message, args) {
     const guildId = message.guild.id;

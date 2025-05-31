@@ -1,7 +1,7 @@
-const { EmbedBuilder } = require('discord.js');
-const supabase = require('../supabaseClient');
+import { EmbedBuilder } from 'discord.js';
+import supabase from './src/supabaseClient'
 
-module.exports = {
+export default {
   name: 'setmod',
   description: 'Set the moderator role',
   async execute(message, args) {

@@ -1,6 +1,6 @@
 // src/commands/mute.js
 
-module.exports = {
+export default {
   name: 'mute',
   description: 'Mute a user for a specified duration (1min to 24hrs). Default is 2 mins. Moderator-level command.',
   usage: '$mute @user [duration]',

@@ -1,4 +1,4 @@
-const { EmbedBuilder, PermissionsBitField } = require('discord.js');
+import { EmbedBuilder, PermissionsBitField } from 'discord.js';
 
 // Helpers to get and set channels in Supabase by guildId
 async function getModCh(guildId) {

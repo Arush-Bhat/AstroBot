@@ -1,8 +1,8 @@
-const { EmbedBuilder } = require('discord.js');
-const supabase = require('../supabaseClient');
-const { isModerator } = require('../utils/permissions');
+import { EmbedBuilder } from 'discord.js';
+import supabase from './src/supabaseClient'
+import { isModerator } from '../utils/permissions';
 
-module.exports = {
+export default {
   name: 'yt',
   async execute(message, args) {
     if (!await isModerator(message.member)) {

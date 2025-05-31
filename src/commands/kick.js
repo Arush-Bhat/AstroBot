@@ -1,6 +1,6 @@
 // src/commands/kick.js
 
-module.exports = {
+export default {
   name: 'kick',
   description: 'Kick a user from the server. Moderator-level command.',
   usage: '$kick @user',

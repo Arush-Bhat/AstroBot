@@ -1,6 +1,6 @@
 // src/commands/modlog.js
 
-module.exports = {
+export default {
   name: 'modlog',
   description: 'Set or get the moderator log channel. Administrator-level command.',
   async execute(client, message, args, supabase) {

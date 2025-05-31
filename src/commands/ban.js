@@ -1,6 +1,6 @@
 // src/commands/ban.js
 
-module.exports = {
+export default {
   name: 'ban',
   description: 'Ban a user from the server. Administrator-level command.',
   usage: '$ban @user',

@@ -57,7 +57,7 @@ function canManageRole(member, targetRole) {
   return targetRole.position < member.roles.highest.position;
 }
 
-module.exports = {
+export default {
   hasRoleOrHigher,
   isAdmin,
   isModerator,

@@ -1,7 +1,7 @@
-const { EmbedBuilder } = require('discord.js');
-const supabase = require('../supabaseClient');
+import { EmbedBuilder } from 'discord.js';
+import supabase from './src/supabaseClient'
 
-module.exports = {
+export default {
   name: 'setadmin',
   description: 'Set the administrator role',
   async execute(message, args) {

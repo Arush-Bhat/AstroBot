@@ -1,7 +1,7 @@
-const { Events } = require('discord.js');
-const supabase = require('../supabaseClient');
+import { Events } from 'discord.js';
+import supabase from './src/supabaseClient'
 
-module.exports = {
+export default {
   name: Events.MessageReactionAdd,
   async execute(reaction, user) {
     if (user.bot) return;

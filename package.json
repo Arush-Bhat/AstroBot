@@ -22,7 +22,7 @@
     "start": "node index.js"
   },
   "repository": {
-    "type": "git",
+    "type": "module",
     "url": "git+https://github.com/Arush-Bhat/AstroBot.git"
   },
   "keywords": [],

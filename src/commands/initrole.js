@@ -1,8 +1,8 @@
-const { SlashCommandBuilder, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
-const supabase = require('../supabaseClient');
-const { isAdmin } = require('../utils/permissions');
+import { SlashCommandBuilder, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
+import supabase from './src/supabaseClient'
+import { isAdmin } from '../utils/permissions';
 
-module.exports = {
+export default {
   name: 'initrole',
   async execute(message, args) {
     // Check admin permission

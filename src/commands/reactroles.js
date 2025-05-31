@@ -1,9 +1,9 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, StringSelectMenuBuilder, PermissionsBitField } = require('discord.js');
-const { getModPermissions } = require('../utils/permissions');
-const { createClient } = require('@supabase/supabase-js');
-const supabase = require('../supabaseClient');
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, StringSelectMenuBuilder, PermissionsBitField } from 'discord.js';
+import { getModPermissions } from '../utils/permissions';
+import { createClient } from './src/supabaseClient'
+import supabase from './src/supabaseClient'
 
-module.exports = {
+export default {
   name: 'reactrole',
   async execute(message, args, client) {
     const { isMod, errorEmbed } = await getModPermissions(message, supabase);

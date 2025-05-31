@@ -1,6 +1,6 @@
 // src/commands/modch.js
 
-module.exports = {
+export default {
   name: 'modch',
   description: 'Set or get the moderator commands channel. Administrator-level command.',
   async execute(client, message, args, supabase) {

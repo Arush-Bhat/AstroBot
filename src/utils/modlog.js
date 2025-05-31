@@ -1,6 +1,6 @@
 // src/utils/modlog.js
 
-const { EmbedBuilder } = require('discord.js');
+import { EmbedBuilder } from 'discord.js';
 
 /**
  * Logs a moderation action to the mod log channel.
@@ -49,4 +49,4 @@ async function logModAction(client, guildId, supabase, action, target, moderator
   }
 }
 
-module.exports = { logModAction };
+export default logModAction;

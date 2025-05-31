@@ -1,5 +1,5 @@
-const supabase = require('./src/supabaseClient');
-const { EmbedBuilder } = require('discord.js');
+import supabase from './src/supabaseClient';
+import { EmbedBuilder } from 'discord.js';
 
 client.on('messageCreate', async message => {
   if (message.author.bot) return;

@@ -1,6 +1,6 @@
-const supabase = require('../supabaseClient');
+import supabase from './src/supabaseClient'
 
-module.exports = {
+export default {
   name: 'messageReactionRemove',
   async execute(reaction, user) {
     if (user.bot) return;
