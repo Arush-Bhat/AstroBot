@@ -4,6 +4,7 @@
   "main": "index.js",
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
+    "dayjs": "^1.11.13",
     "discord-api-types": "^0.38.8",
     "discord.js": "^14.19.3",
     "dotenv": "^16.5.0",
