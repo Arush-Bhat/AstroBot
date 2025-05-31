@@ -5,7 +5,6 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
-  Events,
 } from 'discord.js';
 import { cmdResponseEmbed, cmdErrorEmbed } from '../utils/embeds.js';
 import { logCommand } from '../utils/modlog.js';
@@ -35,8 +34,15 @@ async function execute(client, message, args, supabase) {
         embeds: [
           cmdErrorEmbed(
             'Invalid Syntax',
-            'Usage: `$nickset #channel msg(text) btn(text) @role @visrole`'
-          ),
+            '❌ Missing required arguments.\n\n' +
+            '**Correct Usage:**\n' +
+            '`$nickset #channel msg(Welcome message) btn(Click Me) @role @visrole`\n\n' +
+            '- `#channel`: where the message should be sent\n' +
+            '- `msg(...)`: text to display\n' +
+            '- `btn(...)`: button label\n' +
+            '- `@role`: role to assign after confirmation\n' +
+            '- `@visrole`: role to remove (like "Unverified")'
+          )
         ],
       },
     };
@@ -51,10 +57,26 @@ async function execute(client, message, args, supabase) {
   const row = new ActionRowBuilder().addComponents(button);
 
   // Send interactive message
-  const sent = await channel.send({
-    content: msgText,
-    components: [row],
-  });
+  let sent;
+  try {
+    sent = await channel.send({
+      content: msgText,
+      components: [row],
+    });
+  } catch (err) {
+    console.error('Failed to send nickname prompt:', err);
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Message Send Failed',
+            '❌ I was unable to send the message in the specified channel.\n\n' +
+            'Please ensure I have permission to send messages and use embeds in that channel.'
+          )
+        ],
+      },
+    };
+  }
 
   // Set up collector for button clicks
   const collector = sent.createMessageComponentCollector({
@@ -74,32 +96,37 @@ async function execute(client, message, args, supabase) {
       });
 
       const dm = await interaction.user.createDM();
-      await dm.send('Please enter your real name. This will be set as your nickname.');
+      await dm.send('📛 Please enter your **real name**. This will be set as your nickname.');
 
       const filter = m => m.author.id === interaction.user.id;
       const collected = await dm.awaitMessages({ filter, max: 1, time: 60000 });
       const name = collected.first()?.content;
 
-      if (!name) return await dm.send('❌ No name received. Try again later.');
+      if (!name) return await dm.send('❌ No name received. Please try again later.');
 
-      await dm.send(`Is "${name}" correct? Reply with \`y\` to confirm.`);
+      await dm.send(`✅ Is **"${name}"** correct? Reply with \`y\` to confirm.`);
 
       const confirm = await dm.awaitMessages({ filter, max: 1, time: 30000 });
       const confirmation = confirm.first()?.content.toLowerCase();
 
       if (confirmation !== 'y') {
-        return await dm.send('❌ Confirmation failed. No changes made.');
+        return await dm.send('❌ Confirmation failed. No changes were made.');
       }
 
       await member.setNickname(name, 'Nickname set via $nickset');
       await member.roles.add(targetRole);
       await member.roles.remove(visRole);
 
-      await dm.send('✅ Nickname set and roles updated!');
+      await dm.send('✅ Nickname set successfully and roles updated!');
     } catch (err) {
       console.error('Nickname setup error:', err);
       try {
-        await interaction.user.send('❌ An error occurred. Make sure your DMs are open and try again.');
+        await interaction.user.send(
+          '❌ An error occurred while setting your nickname. Please ensure:\n' +
+          '- Your DMs are open\n' +
+          '- I have permission to change nicknames and manage roles\n\n' +
+          'Then try again.'
+        );
       } catch (_) {}
     }
   });
@@ -109,7 +136,7 @@ async function execute(client, message, args, supabase) {
       embeds: [
         cmdResponseEmbed(
           'Nickname Setup Prompt Sent',
-          `✅ Button message sent to ${channel}.`,
+          `✅ A button message was successfully sent in ${channel}.\nUsers can now click it to begin nickname setup.`,
           'Green'
         ),
       ],

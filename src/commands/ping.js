@@ -9,15 +9,16 @@ const data = {
 };
 
 async function execute(client, message, args, supabase) {
+  // Send initial embed while calculating
   const sent = await message.channel.send({
-    embeds: [cmdResponseEmbed('Calculating latency...')],
+    embeds: [cmdResponseEmbed('🏓 Calculating latency...')],
   });
 
   const messageLatency = sent.createdTimestamp - message.createdTimestamp;
   const apiLatency = Math.round(client.ws.ping);
 
   const embed = cmdResponseEmbed()
-    .setTitle('🏓 Latency Check')
+    .setTitle('🏓 Ping | Latency Check')
     .addFields(
       { name: 'Message Latency', value: `${messageLatency}ms`, inline: true },
       { name: 'API Latency', value: `${apiLatency}ms`, inline: true }

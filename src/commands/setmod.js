@@ -17,7 +17,11 @@ async function execute(client, message, args, supabase) {
     return {
       reply: {
         embeds: [
-          cmdErrorEmbed('❌ Permission Denied', 'You need Administrator permission to set the mod role.'),
+          cmdErrorEmbed(
+            'Permission Denied',
+            '❌ You need **Administrator** permission to use this command.\n\n' +
+            'Only server admins can assign a mod role using `$setmod @role`.'
+          ),
         ],
       },
     };
@@ -28,7 +32,11 @@ async function execute(client, message, args, supabase) {
     return {
       reply: {
         embeds: [
-          cmdErrorEmbed('❌ Invalid Role', 'Please mention a valid role. Usage: `$setmod @role`'),
+          cmdErrorEmbed(
+            'Invalid Role Mention',
+            '❌ Please mention a valid role to set as the moderator role.\n\n' +
+            'Correct usage: `$setmod @role`'
+          ),
         ],
       },
     };
@@ -45,7 +53,11 @@ async function execute(client, message, args, supabase) {
     return {
       reply: {
         embeds: [
-          cmdErrorEmbed('❌ Database Error', 'Failed to save the mod role. Please try again later.'),
+          cmdErrorEmbed(
+            'Database Error',
+            '❌ Failed to save the moderator role in the database.\n\n' +
+            'Please try again later or contact a developer if the problem persists.'
+          ),
         ],
       },
     };
@@ -54,7 +66,10 @@ async function execute(client, message, args, supabase) {
   return {
     reply: {
       embeds: [
-        cmdResponseEmbed('✅ Moderator Role Set', `Moderator role has been set to ${role}.`, 'Green'),
+        cmdResponseEmbed(
+          'Moderator Role Set',
+          `✅ Moderator role has been set to ${role}.`
+        ),
       ],
     },
     log: {

@@ -12,11 +12,30 @@ const data = {
 async function execute(client, message, args, supabase) {
   // Permission check for Manage Roles
   if (!message.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
-    return cmdErrorEmbed(message, 'You need the Manage Roles permission to use this command.');
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            '❌ Permission Denied | Manage Roles Required',
+            'You need the **Manage Roles** permission to use this command.'
+          )
+        ],
+      },
+    };
   }
 
   if (args.length < 2) {
-    return cmdErrorEmbed(message, 'Usage: $derole @user @role');
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            '❌ Invalid Usage | Missing Arguments',
+            'Usage: `$derole @user @role`\n\n' +
+            'Example: `$derole @JohnDoe @Muted`'
+          )
+        ],
+      },
+    };
   }
 
   const userMention = args[0];
@@ -29,53 +48,102 @@ async function execute(client, message, args, supabase) {
   try {
     member = await message.guild.members.fetch(userId);
   } catch {
-    return cmdErrorEmbed(message, 'Please mention a valid user.');
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            '❌ Invalid User | User Not Found',
+            'Please mention a valid user to remove the role from.\n\n' +
+            'Usage: `$derole @user @role`'
+          )
+        ],
+      },
+    };
   }
 
   const role = message.guild.roles.cache.get(roleId);
   if (!role) {
-    return cmdErrorEmbed(message, 'Please mention a valid role.');
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            '❌ Invalid Role | Role Not Found',
+            'Please mention a valid role to remove.\n\n' +
+            'Usage: `$derole @user @role`'
+          )
+        ],
+      },
+    };
   }
 
   if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
-    return cmdErrorEmbed(message, 'I need Manage Roles permission to do that.');
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            '❌ Missing Permission | Bot Needs Manage Roles',
+            'I need the **Manage Roles** permission to remove roles from members.'
+          )
+        ],
+      },
+    };
   }
 
   // Check role hierarchy (bot)
   const botHighestRole = message.guild.members.me.roles.highest;
   if (role.position >= botHighestRole.position) {
-    return cmdErrorEmbed(
-      message,
-      'I cannot manage a role higher or equal to my highest role.'
-    );
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            '❌ Hierarchy Error | Bot Role Too Low',
+            'I cannot manage a role that is higher or equal to my highest role.'
+          )
+        ],
+      },
+    };
   }
 
   // Check role hierarchy (author)
   const authorHighestRole = message.member.roles.highest;
   if (role.position >= authorHighestRole.position) {
-    return cmdErrorEmbed(
-      message,
-      'You cannot manage a role higher or equal to your highest role.'
-    );
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            '❌ Hierarchy Error | Your Role Too Low',
+            'You cannot remove a role that is higher or equal to your highest role.'
+          )
+        ],
+      },
+    };
   }
 
   try {
     if (!member.roles.cache.has(role.id)) {
-      return cmdWarningEmbed(
-        message,
-        `${member.user.tag} does not have the role ${role.name}.`
-      );
+      return {
+        reply: {
+          embeds: [
+            cmdWarningEmbed(
+              '⚠️ Role Not Found | Member Missing Role',
+              `${member.user.tag} does not have the role **${role.name}**.`
+            )
+          ],
+        },
+      };
     }
 
     await member.roles.remove(role);
 
-    await cmdResponseEmbed(
-      message,
-      `Removed role ${role.name} from ${member.user.tag}.`
-    );
-
-    // Optionally log here if you want, e.g. return log info:
     return {
+      reply: {
+        embeds: [
+          cmdResponseEmbed(
+            '✅ Role Removed',
+            `Removed role **${role.name}** from ${member.user.tag}.`
+          )
+        ],
+      },
       log: {
         action: 'derole',
         targetUserId: member.id,
@@ -90,12 +158,18 @@ async function execute(client, message, args, supabase) {
     };
   } catch (error) {
     console.error('Error removing role:', error);
-    return cmdErrorEmbed(
-      message,
-      'There was an error removing the role. Check my permissions and role hierarchy.'
-    );
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            '❌ Action Failed | Unable to Remove Role',
+            'There was an error removing the role. Please check my permissions and the role hierarchy.'
+          )
+        ],
+      },
+    };
   }
-};
+}
 
 export default {
   data,

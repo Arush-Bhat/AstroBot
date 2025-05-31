@@ -1,5 +1,3 @@
-// src/commands/ban.js
-
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 
 const permissionLevel = 'Admin';
@@ -18,14 +16,30 @@ async function execute(client, message, args, supabase) {
   const target = message.mentions.members.first();
   if (!target) {
     return {
-      reply: { embeds: [cmdErrorEmbed('Please mention a valid user to ban.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Invalid Usage',
+            '❌ Please mention a valid user to ban.\n\n' +
+            'Usage example: `$ban @user Spamming in chat`'
+          )
+        ],
+      },
     };
   }
 
   // Check if target is server owner
   if (target.id === guild.ownerId) {
     return {
-      reply: { embeds: [cmdErrorEmbed('Cannot ban the server owner.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Invalid Action',
+            '❌ Cannot ban the server owner.\n\n' +
+            'Please choose another user.'
+          )
+        ],
+      },
     };
   }
 
@@ -35,15 +49,24 @@ async function execute(client, message, args, supabase) {
     message.author.id !== guild.ownerId
   ) {
     return {
-      reply: { embeds: [cmdErrorEmbed('You cannot ban someone with equal or higher role.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Permission Denied',
+            '❌ You cannot ban someone with equal or higher role.\n\n' +
+            'Ensure your role is higher than the user you want to ban.'
+          )
+        ],
+      },
     };
   }
 
   // Extract reason: everything after the mention, fallback default
   const mentionIndex = message.content.indexOf('>');
-  const reason = mentionIndex !== -1
-    ? message.content.slice(mentionIndex + 1).trim() || 'No reason provided'
-    : 'No reason provided';
+  const reason =
+    mentionIndex !== -1
+      ? message.content.slice(mentionIndex + 1).trim() || 'No reason provided'
+      : 'No reason provided';
 
   try {
     await target.ban({ reason: `Banned by ${message.author.tag}: ${reason}` });
@@ -61,13 +84,17 @@ async function execute(client, message, args, supabase) {
 
     if (error) {
       console.error('Supabase logging error:', error);
-      // Optionally notify about log failure but do not block ban success
+      // Optional: Could notify in a warning embed here if you want
     }
 
-    // Send success reply
     return {
       reply: {
-        embeds: [cmdResponseEmbed(`🔨 **${target.user.tag}** was banned.\n**Reason:** ${reason}`)],
+        embeds: [
+          cmdResponseEmbed(
+            'User Banned',
+            `🔨 **${target.user.tag}** was banned.\n**Reason:** ${reason}`
+          )
+        ],
       },
       log: {
         action: 'ban',
@@ -83,10 +110,17 @@ async function execute(client, message, args, supabase) {
   } catch (err) {
     console.error('Ban failed:', err);
     return {
-      reply: { embeds: [cmdErrorEmbed('Failed to ban the user. Check bot permissions.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Action Failed',
+            '❌ Failed to ban the user. Please check that I have the necessary permissions.'
+          )
+        ],
+      },
     };
   }
-};
+}
 
 export default {
   data,

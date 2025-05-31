@@ -12,36 +12,45 @@ const data = {
 async function execute(client, message, args, supabase) {
   const member = message.member;
 
-  // Check permission using your helper
+  // Check permission
   if (!(await isModerator(member, supabase))) {
-    return {
-      reply: {
-        embeds: [cmdErrorEmbed('Unauthorized', 'Only moderators can use this command.')],
-      },
-    };
-  }
-
-  if (!args.length) {
     return {
       reply: {
         embeds: [
           cmdErrorEmbed(
-            'Usage',
-            'Use:\n• `$yt #channel` to set the updates channel\n• `$yt <YouTube URL>` to subscribe to a YouTube channel'
+            'Permission Denied',
+            '❌ Only moderators can use this command.\n\n' +
+            'Ask an admin to assign you the correct role or use `$setmod @role` to configure.'
           ),
         ],
       },
     };
   }
 
-  // Check if a channel was mentioned
+  // Check for arguments
+  if (!args.length) {
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Missing Arguments',
+            '❌ You must provide either a channel mention or a YouTube channel URL.\n\n' +
+            '**Usage:**\n' +
+            '• `$yt #channel` → Set update channel\n' +
+            '• `$yt https://youtube.com/@channelname` → Subscribe to channel'
+          ),
+        ],
+      },
+    };
+  }
+
+  // Handle channel mention
   const channelMention = message.mentions.channels.first();
 
-  // Regex for YouTube channel URLs (c/, @, channel/)
+  // Regex for YouTube channel URLs
   const ytUrlPattern = /^https?:\/\/(www\.)?youtube\.com\/(c\/|@|channel\/)?[a-zA-Z0-9_\-]+/i;
 
   if (channelMention) {
-    // Set updates channel in database
     const { error } = await supabase
       .from('yt_settings')
       .upsert(
@@ -56,14 +65,25 @@ async function execute(client, message, args, supabase) {
       console.error(error);
       return {
         reply: {
-          embeds: [cmdErrorEmbed('Database Error', 'Failed to set updates channel. Please try again later.')],
+          embeds: [
+            cmdErrorEmbed(
+              'Database Error',
+              '❌ Failed to set the YouTube updates channel.\n\n' +
+              'Please try again later or contact support.'
+            ),
+          ],
         },
       };
     }
 
     return {
       reply: {
-        embeds: [cmdResponseEmbed('YouTube Updates Channel Set', `Updates will be posted in ${channelMention}`)],
+        embeds: [
+          cmdResponseEmbed(
+            'YouTube Updates Channel Set',
+            `✅ YouTube updates will now be posted in ${channelMention}.`
+          ),
+        ],
       },
       log: {
         action: 'yt_updates_channel_set',
@@ -76,19 +96,23 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // If argument matches a YouTube channel URL, subscribe to it
+  // Handle YouTube URL
   if (ytUrlPattern.test(args[0])) {
-    // Ensure updates channel is set
     const { data: ytSetting, error: ytSettingError } = await supabase
       .from('yt_settings')
       .select('updates_channel_id')
       .eq('guild_id', message.guild.id)
       .single();
 
-    if (ytSettingError || !ytSetting || !ytSetting.updates_channel_id) {
+    if (ytSettingError || !ytSetting?.updates_channel_id) {
       return {
         reply: {
-          embeds: [cmdErrorEmbed('Missing Update Channel', 'Please set an updates channel first using `$yt #channel`.')],
+          embeds: [
+            cmdErrorEmbed(
+              'Missing Updates Channel',
+              '❌ Please set an updates channel first using:\n`$yt #channel`.'
+            ),
+          ],
         },
       };
     }
@@ -109,14 +133,25 @@ async function execute(client, message, args, supabase) {
       console.error(error);
       return {
         reply: {
-          embeds: [cmdErrorEmbed('Database Error', 'Failed to save YouTube channel. Please try again later.')],
+          embeds: [
+            cmdErrorEmbed(
+              'Database Error',
+              '❌ Failed to subscribe to YouTube channel.\n\n' +
+              'Check the URL format and try again.'
+            ),
+          ],
         },
       };
     }
 
     return {
       reply: {
-        embeds: [cmdResponseEmbed('YouTube Channel Subscribed', `Now tracking: ${url}`)],
+        embeds: [
+          cmdResponseEmbed(
+            'YouTube Channel Subscribed',
+            `📺 Now tracking: ${url}`
+          ),
+        ],
       },
       log: {
         action: 'yt_channel_subscribed',
@@ -129,13 +164,17 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // If none matched, invalid argument
+  // Invalid input
   return {
     reply: {
       embeds: [
         cmdErrorEmbed(
           'Invalid Argument',
-          'Please provide either a YouTube channel URL or tag a text channel.'
+          '❌ That input wasn’t recognized.\n\n' +
+          '**Expected:** A YouTube channel URL or a channel mention.\n\n' +
+          '**Examples:**\n' +
+          '• `$yt #yt-updates`\n' +
+          '• `$yt https://youtube.com/@astrochannel`'
         ),
       ],
     },

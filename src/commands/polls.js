@@ -1,13 +1,14 @@
 import { EmbedBuilder } from 'discord.js';
-import supabase from '../supabaseClient.js';
-import { isModerator, canManageRole } from '../utils/permissions.js';
+import { isModerator } from '../utils/permissions.js';
 
 const permissionLevel = 'Mod';
 
 const data = {
   name: 'polls',
   description: 'Create or conclude polls using advanced syntax.',
-  usage: '$polls #channel msg("Poll question") options((emoji:"Text"), ...) config(multiple=true/false)\n$polls #channel msgId("message_id") conclude',
+  usage:
+    '$polls #channel msg("Poll question") options((emoji:"Text"), ...) config(multiple=true/false)\n' +
+    '$polls #channel msgId("message_id") conclude',
 };
 
 async function execute(client, message, args, supabase) {
@@ -17,11 +18,17 @@ async function execute(client, message, args, supabase) {
   if (!(await isModerator(message.member))) {
     return {
       reply: {
-        embeds: [new EmbedBuilder().setColor('Red').setDescription("❌ You don't have permission to use this command.")],
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('❌ Permission Denied')
+            .setDescription('You must be a moderator to use this command.'),
+        ],
       },
     };
   }
 
+  // Utility parsing
   function parseParenArg(str, key) {
     const regex = new RegExp(`${key}\\("([^"]+)"\\)`);
     const match = str.match(regex);
@@ -41,8 +48,7 @@ async function execute(client, message, args, supabase) {
   function parseConfig(str) {
     const regex = /config\(multiple=(true|false)\)/;
     const match = str.match(regex);
-    if (!match) return { multiple: true };
-    return { multiple: match[1] === 'true' };
+    return { multiple: match ? match[1] === 'true' : true };
   }
 
   // 🛑 Conclude Poll
@@ -53,7 +59,12 @@ async function execute(client, message, args, supabase) {
     if (!messageId) {
       return {
         reply: {
-          embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Invalid msgId format. Use msgId("message_id")')],
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setTitle('❌ Invalid Syntax')
+              .setDescription('Missing or malformed `msgId`.\n\nExample: `msgId("123456789012345678")`'),
+          ],
         },
       };
     }
@@ -63,7 +74,14 @@ async function execute(client, message, args, supabase) {
 
     if (!channel) {
       return {
-        reply: { embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Invalid channel mention.')] },
+        reply: {
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setTitle('❌ Invalid Channel')
+              .setDescription('Make sure you mention a valid channel. Example: `#polls`'),
+          ],
+        },
       };
     }
 
@@ -76,7 +94,14 @@ async function execute(client, message, args, supabase) {
 
     if (error || !data) {
       return {
-        reply: { embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ No such poll found.')] },
+        reply: {
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setTitle('❌ Poll Not Found')
+              .setDescription('No active poll found with the provided message ID.'),
+          ],
+        },
       };
     }
 
@@ -86,12 +111,12 @@ async function execute(client, message, args, supabase) {
       const results = [];
 
       for (const [emoji, reaction] of reactions) {
-        const count = (await reaction.users.fetch()).filter(u => !u.bot).size;
+        const count = (await reaction.users.fetch()).filter((u) => !u.bot).size;
         results.push({ emoji, count });
       }
 
       const sorted = results.sort((a, b) => b.count - a.count);
-      const stats = sorted.map(r => `${r.emoji}: ${r.count}`).join('\n') || 'No votes';
+      const stats = sorted.map((r) => `${r.emoji}: ${r.count}`).join('\n') || 'No votes received.';
 
       const resultEmbed = new EmbedBuilder()
         .setTitle('📊 Poll Results')
@@ -105,12 +130,19 @@ async function execute(client, message, args, supabase) {
       await supabase.from('polls').delete().eq('message_id', messageId);
 
       return {
-        reply: { embeds: [new EmbedBuilder().setColor('Green').setDescription('✅ Poll concluded.')] },
+        reply: {
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Green')
+              .setTitle('✅ Poll Concluded')
+              .setDescription('Results posted and poll deleted.'),
+          ],
+        },
         log: {
           action: 'concludePoll',
           pollTitle: data.title,
           channelId: channel.id,
-          messageId: messageId,
+          messageId,
           concludedBy: authorId,
           timestamp: new Date().toISOString(),
         },
@@ -118,7 +150,14 @@ async function execute(client, message, args, supabase) {
     } catch (err) {
       console.error('Error concluding poll:', err);
       return {
-        reply: { embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Error concluding poll.')] },
+        reply: {
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setTitle('❌ Unexpected Error')
+              .setDescription('An error occurred while concluding the poll. Check my permissions and try again.'),
+          ],
+        },
       };
     }
   }
@@ -127,7 +166,16 @@ async function execute(client, message, args, supabase) {
   if (args.length < 3) {
     return {
       reply: {
-        embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Invalid command syntax.')],
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('❌ Invalid Syntax')
+            .setDescription(
+              'You must provide at least a channel, question, and two options.\n\n' +
+              '**Example:**\n' +
+              '`$polls #polls msg("Your question?") options((👍:"Yes"), (👎:"No")) config(multiple=false)`'
+            ),
+        ],
       },
     };
   }
@@ -138,7 +186,14 @@ async function execute(client, message, args, supabase) {
 
   if (!channel) {
     return {
-      reply: { embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Invalid channel mention.')] },
+      reply: {
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('❌ Invalid Channel')
+            .setDescription('Could not resolve the mentioned channel. Please use `#channel`.'),
+        ],
+      },
     };
   }
 
@@ -151,7 +206,12 @@ async function execute(client, message, args, supabase) {
   if (!pollQuestion) {
     return {
       reply: {
-        embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Missing poll question. Use msg("Your question")')],
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('❌ Missing Question')
+            .setDescription('Use `msg("Your poll question")` to provide a question.'),
+        ],
       },
     };
   }
@@ -159,7 +219,12 @@ async function execute(client, message, args, supabase) {
   if (options.length < 2) {
     return {
       reply: {
-        embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ You must specify at least 2 options.')],
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('❌ Too Few Options')
+            .setDescription('You must include **at least two options**.\n\nExample:\n`options((👍:"Yes"), (👎:"No"))`'),
+        ],
       },
     };
   }
@@ -167,7 +232,7 @@ async function execute(client, message, args, supabase) {
   const embed = new EmbedBuilder()
     .setTitle('🗳️ New Poll')
     .setDescription(pollQuestion)
-    .addFields(options.map(opt => ({ name: opt.emoji, value: opt.text, inline: true })))
+    .addFields(options.map((opt) => ({ name: opt.emoji, value: opt.text, inline: true })))
     .setFooter({ text: isMulti ? 'Users can vote for multiple options.' : 'Users can vote only once.' })
     .setColor('Green');
 

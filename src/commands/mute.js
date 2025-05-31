@@ -1,4 +1,4 @@
-// src/commands/mute.js
+import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 
 const permissionLevel = 'Mod';
 
@@ -22,7 +22,14 @@ async function execute(client, message, args, supabase) {
   if (error) {
     console.error(error);
     return {
-      reply: { embeds: [cmdErrorEmbed('Database Error', '❌ Database error fetching roles.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Database Error',
+            '❌ Database error fetching roles.\n\nPlease try again later or contact support.'
+          )
+        ],
+      },
     };
   }
 
@@ -31,7 +38,14 @@ async function execute(client, message, args, supabase) {
 
   if (!modRoleId) {
     return {
-      reply: { embeds: [cmdErrorEmbed('Missing Mod Role', '❌ Mod role not set. Use `$setmod @role` first.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Missing Mod Role',
+            '❌ Mod role not set.\n\nPlease configure it using `$setmod @role` before using mute.'
+          )
+        ],
+      },
     };
   }
 
@@ -41,26 +55,55 @@ async function execute(client, message, args, supabase) {
     !member.permissions.has('ADMINISTRATOR')
   ) {
     return {
-      reply: { embeds: [cmdErrorEmbed('Permission Denied', '❌ You do not have permission to mute users.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Permission Denied',
+            '❌ You do not have permission to mute users.\n\n' +
+            'Required: Moderator or Admin role, or Administrator permission.'
+          )
+        ],
+      },
     };
   }
 
   if (args.length < 1) {
     return {
-      reply: { embeds: [cmdErrorEmbed('Invalid Usage', '❌ Please mention a user to mute.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Invalid Usage',
+            '❌ Please mention a user to mute.\n\nUsage: `$mute @user [duration]`\nDuration formats: `2mins`, `1hour`, `3hrs` (optional, default 2 mins).'
+          )
+        ],
+      },
     };
   }
 
   const target = message.mentions.members.first();
   if (!target) {
     return {
-      reply: { embeds: [cmdErrorEmbed('Invalid User', '❌ Please mention a valid user.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Invalid User',
+            '❌ Please mention a valid user.\n\nExample: `$mute @username 10mins`'
+          )
+        ],
+      },
     };
   }
 
   if (target.id === guild.ownerId) {
     return {
-      reply: { embeds: [cmdErrorEmbed('Not Allowed', '❌ Cannot mute the server owner.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Not Allowed',
+            '❌ Cannot mute the server owner.'
+          )
+        ],
+      },
     };
   }
 
@@ -69,26 +112,48 @@ async function execute(client, message, args, supabase) {
     message.author.id !== guild.ownerId
   ) {
     return {
-      reply: { embeds: [cmdErrorEmbed('Not Allowed', '❌ You cannot mute someone with equal or higher role.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Not Allowed',
+            '❌ You cannot mute someone with equal or higher role.\n\n' +
+            'Ensure your role is higher than the target user.'
+          )
+        ],
+      },
     };
   }
 
   // Duration handling
-  let durationMs = 2 * 60 * 1000;
+  let durationMs = 2 * 60 * 1000; // Default 2 minutes
   if (args[1]) {
     const match = args[1].toLowerCase().match(/^(\d+)(min|mins|hr|hrs|hour|hours)$/);
     if (!match) {
       return {
-        reply: { embeds: [cmdErrorEmbed('Invalid Duration', '❌ Use formats like `2mins`, `1hour`, `3hrs`.')] },
+        reply: {
+          embeds: [
+            cmdErrorEmbed(
+              'Invalid Duration',
+              '❌ Duration format invalid.\n\nUse formats like `2mins`, `1hour`, `3hrs`.'
+            )
+          ],
+        },
       };
     }
 
-    const amount = parseInt(match[1]);
+    const amount = parseInt(match[1], 10);
     const unit = match[2];
 
     if (amount < 1) {
       return {
-        reply: { embeds: [cmdErrorEmbed('Invalid Duration', '❌ Duration must be at least 1 minute.')] },
+        reply: {
+          embeds: [
+            cmdErrorEmbed(
+              'Invalid Duration',
+              '❌ Duration must be at least 1 minute.'
+            )
+          ],
+        },
       };
     }
 
@@ -98,7 +163,14 @@ async function execute(client, message, args, supabase) {
 
     if (durationMs > 24 * 60 * 60 * 1000) {
       return {
-        reply: { embeds: [cmdErrorEmbed('Too Long', '❌ Maximum mute duration is 24 hours.')] },
+        reply: {
+          embeds: [
+            cmdErrorEmbed(
+              'Too Long',
+              '❌ Maximum mute duration is 24 hours.'
+            )
+          ],
+        },
       };
     }
   }
@@ -126,14 +198,28 @@ async function execute(client, message, args, supabase) {
     } catch (err) {
       console.error(err);
       return {
-        reply: { embeds: [cmdErrorEmbed('Error', '❌ Failed to create Muted role.')] },
+        reply: {
+          embeds: [
+            cmdErrorEmbed(
+              'Error',
+              '❌ Failed to create Muted role.\n\nCheck bot permissions and try again.'
+            )
+          ],
+        },
       };
     }
   }
 
   if (target.roles.cache.has(mutedRole.id)) {
     return {
-      reply: { embeds: [cmdErrorEmbed('Already Muted', '❌ User is already muted.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Already Muted',
+            '❌ User is already muted.'
+          )
+        ],
+      },
     };
   }
 
@@ -142,7 +228,14 @@ async function execute(client, message, args, supabase) {
   } catch (err) {
     console.error(err);
     return {
-      reply: { embeds: [cmdErrorEmbed('Error', '❌ Failed to assign Muted role.')] },
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Error',
+            '❌ Failed to assign Muted role.\n\nCheck bot permissions and role hierarchy.'
+          )
+        ],
+      },
     };
   }
 

@@ -12,25 +12,40 @@ const data = {
 async function execute(client, message, args, supabase) {
   const member = message.member;
 
+  // Check for administrator permission
   if (!member.permissions.has('Administrator')) {
     return {
       reply: {
-        embeds: [cmdErrorEmbed('❌ Permission Denied', 'You need Administrator permission to set the admin role.')],
+        embeds: [
+          cmdErrorEmbed(
+            'Permission Denied',
+            '❌ You need the **Administrator** permission to use this command.\n\n' +
+            'Only server admins can configure roles.'
+          )
+        ],
       },
     };
   }
 
+  // Validate mentioned role
   const role = message.mentions.roles.first();
   if (!role) {
     return {
       reply: {
-        embeds: [cmdErrorEmbed('❌ Invalid Role', 'Please mention a valid role. Usage: `$setadmin @role`')],
+        embeds: [
+          cmdErrorEmbed(
+            'Invalid Role',
+            '❌ Please mention a **valid role** to set as the Administrator role.\n\n' +
+            'Example: `$setadmin @AdminRole`'
+          )
+        ],
       },
     };
   }
 
   const guildId = message.guild.id;
 
+  // Save to Supabase
   const { error } = await supabase
     .from('guild_settings')
     .upsert({ guild_id: guildId, admin_role_id: role.id })
@@ -40,7 +55,13 @@ async function execute(client, message, args, supabase) {
     console.error(error);
     return {
       reply: {
-        embeds: [cmdErrorEmbed('❌ Database Error', 'Failed to save the admin role. Please try again later.')],
+        embeds: [
+          cmdErrorEmbed(
+            'Database Error',
+            '❌ Failed to save the admin role to the database.\n\n' +
+            'Please try again later or contact a bot developer.'
+          )
+        ],
       },
     };
   }
@@ -48,7 +69,10 @@ async function execute(client, message, args, supabase) {
   return {
     reply: {
       embeds: [
-        cmdResponseEmbed('✅ Administrator Role Set', `Administrator role has been set to ${role.toString()}.`, 'Green'),
+        cmdResponseEmbed(
+          'Administrator Role Set',
+          `✅ Administrator role has been set to ${role.toString()}.`
+        ),
       ],
     },
     log: {
