@@ -1,6 +1,6 @@
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embedHelpers.js';
 
-export const permissionLevel = 'Admin';
+const permissionLevel = 'Admin';
 
 const data = {
   name: 'modch',

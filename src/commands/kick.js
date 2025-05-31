@@ -1,6 +1,6 @@
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embedHelpers.js';
 
-export const permissionLevel = 'Mod';
+const permissionLevel = 'Mod';
 
 const data = {
   name: 'kick',

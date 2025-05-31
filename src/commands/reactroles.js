@@ -1,5 +1,5 @@
 import { EmbedBuilder } from 'discord.js';
-import { supabase } from '../supabaseClient.js';
+import supabase from '../supabaseClient.js';
 import { getModPermissions } from '../utils/permissions.js';
 
 const permissionLevel = 'Mod';

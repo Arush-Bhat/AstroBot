@@ -1,4 +1,4 @@
-import { supabase } from '../supabaseClient.js';
+import supabase from '../supabaseClient.js';
 import { cmdErrorEmbed, cmdWarningEmbed } from '../utils/embeds.js';
 import { logCommand } from '../utils/modlog.js';
 

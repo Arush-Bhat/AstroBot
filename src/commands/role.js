@@ -73,7 +73,7 @@ async function execute(message, args) {
     console.error('Error adding role:', error);
     await message.channel.send({ embeds: [cmdErrorEmbed('❌ Error', 'There was an error adding the role. Check my permissions and role hierarchy.')] });
   }
-}
+};
 
 export default {
   permissionLevel,
