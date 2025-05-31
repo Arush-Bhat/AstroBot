@@ -5,7 +5,7 @@ import { setupHandlers } from './src/events/loader.js';
 
 dotenv.config();
 
-console.log('Discord Token:', process.env.TOKEN ? '[FOUND]' : '[MISSING]');
+console.log('Discord Token:', process.env.DISCORD_BOT_TOKEN ? '[SET]' : '[MISSING]');
 
 const client = new Client({
   intents: [
@@ -30,7 +30,7 @@ app.listen(process.env.PORT || 3000, () => {
   console.log('Express server started');
 });
 
-client.login(process.env.TOKEN).catch(err => {
+client.login(process.env.DISCORD_BOT_TOKEN).catch(err => {
   console.error('Failed to login:', err);
   process.exit(1);
 });
