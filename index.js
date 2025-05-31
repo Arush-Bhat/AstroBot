@@ -106,11 +106,11 @@ async function handleModLogCommand(message, args) {
 }
 
 // Use these in your command dispatcher, e.g.
-if (command === 'modch') {
+/*if (command === 'modch') {
   await handleModChCommand(message, args);
 } else if (command === 'modlog') {
   await handleModLogCommand(message, args);
-}
+}*/
 
 // Helper: send error embed
 function sendErrorEmbed(message, text) {
