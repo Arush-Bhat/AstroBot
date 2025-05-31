@@ -7,4 +7,6 @@ if (!supabaseUrl || !supabaseKey) {
   console.error('Missing SUPABASE_URL or SUPABASE_KEY environment variables');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey); // ✅ Named export
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+export default supabase; // ✅ default export for ESM
