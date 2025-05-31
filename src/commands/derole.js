@@ -1,15 +1,15 @@
 import { PermissionsBitField } from 'discord.js';
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embedHelpers.js';
 
-export const permissionLevel = 'Mod';
+const permissionLevel = 'Mod';
 
-export const data = {
+const data = {
   name: 'derole',
   description: 'Remove a role from a user',
   usage: '$derole @user @role',
 };
 
-export async function execute(message, args) {
+async function execute(message, args) {
   // Permission check for Manage Roles
   if (!message.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
     return {
@@ -142,4 +142,10 @@ export async function execute(message, args) {
       },
     };
   }
+};
+
+export default {
+  permissionLevel,
+  data,
+  execute,
 };

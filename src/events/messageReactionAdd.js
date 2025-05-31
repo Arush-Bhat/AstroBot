@@ -1,9 +1,9 @@
 import { Events } from 'discord.js';
-import supabase from './src/supabaseClient';
+import supabase from '../supabaseClient.js';
 
 export default {
   name: Events.MessageReactionAdd,
-  async execute(reaction, user) {
+  async execute(reaction, user, client) {
     if (user.bot) return;
 
     const { message, emoji } = reaction;
@@ -18,7 +18,6 @@ export default {
         .single();
 
       if (reactionRoleError && reactionRoleError.code !== 'PGRST116') {
-        // Ignore "no rows found" errors, but log others
         console.error('Supabase error fetching reaction role:', reactionRoleError);
       }
 
@@ -55,7 +54,6 @@ export default {
       }
 
       if (poll && !poll.is_multi) {
-        // Remove all other reactions from this user if poll is single-choice
         const userReactions = message.reactions.cache.filter(r => r.users.cache.has(user.id));
 
         for (const r of userReactions.values()) {

@@ -1,15 +1,15 @@
 import { cmdErrorEmbed, cmdWarningEmbed, cmdResponseEmbed } from '../utils/embedHelpers.js';
 import { PermissionsBitField } from 'discord.js';
 
-export const permissionLevel = 'Mod';
+const permissionLevel = 'Mod';
 
-export const data = {
+const data = {
   name: 'role',
   description: 'Assign a role to a user',
   usage: '$role @user @role',
 };
 
-export async function execute(message, args) {
+async function execute(message, args) {
   if (!message.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
     return message.channel.send({ embeds: [cmdErrorEmbed('❌ Unauthorized', 'You need the Manage Roles permission to use this command.')] });
   }
@@ -74,3 +74,9 @@ export async function execute(message, args) {
     await message.channel.send({ embeds: [cmdErrorEmbed('❌ Error', 'There was an error adding the role. Check my permissions and role hierarchy.')] });
   }
 }
+
+export default {
+  permissionLevel,
+  data,
+  execute,
+};

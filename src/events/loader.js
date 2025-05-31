@@ -13,10 +13,14 @@ export async function setupHandlers(client) {
   const eventFiles = readdirSync(eventsPath).filter(file => file.endsWith('.js') && file !== 'loader.js');
 
   for (const file of eventFiles) {
-    const event = await import(`./${file}`);
-    const eventName = file.split('.')[0];
-    client.on(eventName, (...args) => event.default(...args, client));
-    console.log(`✅ Loaded event: ${eventName}`);
+    try {
+      const event = await import(`./${file}`);
+      const eventName = file.split('.')[0];
+      client.on(eventName, (...args) => event.default(...args, client));
+      console.log(`✅ Loaded event: ${eventName}`);
+    } catch (err) {
+      console.error(`❌ Failed to load event ${file}:`, err);
+    }
   }
 
   // === Load Commands ===
@@ -25,9 +29,13 @@ export async function setupHandlers(client) {
   const commandFiles = readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
   for (const file of commandFiles) {
-    const command = await import(`../commands/${file}`);
-    client.commands.set(command.default.name, command.default);
-    console.log(`📦 Loaded command: ${command.default.name}`);
+    try {
+      const command = await import(`../commands/${file}`);
+      client.commands.set(command.default.name, command.default);
+      console.log(`📦 Loaded command: ${command.default.name}`);
+    } catch (err) {
+      console.error(`❌ Failed to load command ${file}:`, err);
+    }
   }
 
   // === Setup messageCreate listener for prefix commands ===
@@ -44,12 +52,12 @@ export async function setupHandlers(client) {
     try {
       const result = await command.execute(client, message, args, supabase);
 
-      // Send bot reply
+      // Send bot reply if any
       if (result?.reply) {
         await message.reply(result.reply);
       }
 
-      // Send log if specified
+      // Log command if specified
       if (result?.log) {
         await logCommand(result.log);
       }

@@ -1,7 +1,6 @@
-import supabase from './src/supabaseClient.js';
-import { client } from '../index.js';
-import { cmdErrorEmbed, cmdWarningEmbed } from './src/utils/embeds.js';
-import { logCommand } from './src/utils/modlog.js';  // The centralized logging function
+import supabase from '../supabaseClient.js';
+import { cmdErrorEmbed, cmdWarningEmbed } from '../utils/embeds.js';
+import { logCommand } from '../utils/modlog.js';
 
 // Helper: check if user has a role or higher
 function hasRoleOrHigher(member, roleId) {
@@ -13,7 +12,8 @@ function hasRoleOrHigher(member, roleId) {
   return memberRoles.some(r => r.position >= targetRole.position);
 }
 
-client.on('messageCreate', async message => {
+// Export default async function as event handler for 'messageCreate'
+export default async function messageCreate(message, client) {
   if (message.author.bot) return;
   if (!message.content.startsWith('$')) return;
 
@@ -113,4 +113,4 @@ client.on('messageCreate', async message => {
     console.error('Command execution error:', err);
     await cmdErrorEmbed(message, 'There was an error while executing this command.');
   }
-});
+}

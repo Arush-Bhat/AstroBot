@@ -1,8 +1,8 @@
-import supabase from './src/supabaseClient';
+import supabase from './src/supabaseClient.js';
 
 export default {
   name: 'messageReactionRemove',
-  async execute(reaction, user) {
+  async execute(reaction, user, client) {
     if (user.bot) return;
 
     // Fetch full reaction object if partial
