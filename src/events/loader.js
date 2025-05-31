@@ -50,7 +50,9 @@ export async function setupHandlers(client) {
     if (!command) return;
 
     try {
-      const result = await command.execute(client, message, args, supabase);
+        const result = await (command.execute.length === 4
+            ? command.execute(client, message, args, supabase)
+            : command.execute(message, args));
 
       // Send bot reply if any
       if (result?.reply) {
