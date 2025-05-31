@@ -1,8 +1,11 @@
 import { Client, GatewayIntentBits } from 'discord.js';
 import dotenv from 'dotenv';
 import express from 'express';
+import { setupHandlers } from './src/events/loader.js';
 
 dotenv.config();
+
+console.log('Discord Token:', process.env.TOKEN ? '[FOUND]' : '[MISSING]');
 
 const client = new Client({
   intents: [
@@ -18,6 +21,8 @@ const client = new Client({
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
+
+setupHandlers(client);
 
 const app = express();
 app.get('/', (_, res) => res.send('Bot is running'));
