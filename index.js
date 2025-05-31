@@ -1,8 +1,7 @@
 import { Client, GatewayIntentBits } from 'discord.js';
 import dotenv from 'dotenv';
 import express from 'express';
-import { setupHandlers } from './src/events/loader.js'; // If you have a handler loader
-import { sendErrorEmbed } from './src/utils/embeds.js'; // Move the utility here
+import { setupHandlers } from './src/events/loader.js';
 
 dotenv.config();
 
@@ -14,20 +13,26 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.DirectMessages,
   ],
-  partials: ['CHANNEL'], // Needed for DMs
+  partials: ['MESSAGE', 'CHANNEL', 'REACTION'],
 });
 
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
-// Setup dynamic handler loading
 setupHandlers(client);
 
-// Optional Express server to keep Render happy
 const app = express();
 app.get('/', (_, res) => res.send('Bot is running'));
-app.listen(process.env.PORT || 3000);
+app.listen(process.env.PORT || 3000, () => {
+  console.log('Express server started');
+});
 
-// Login
-client.login(process.env.TOKEN);
+client.login(process.env.TOKEN).catch(err => {
+  console.error('Failed to login:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', error => {
+  console.error('Unhandled promise rejection:', error);
+});

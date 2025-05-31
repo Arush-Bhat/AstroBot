@@ -1,4 +1,7 @@
-import { EmbedBuilder, PermissionsBitField } from 'discord.js';
+import { PermissionsBitField } from 'discord.js';
+import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embedHelpers.js';
+
+export const permissionLevel = 'Mod';
 
 export const data = {
   name: 'derole',
@@ -7,22 +10,21 @@ export const data = {
 };
 
 export async function execute(message, args) {
+  // Permission check for Manage Roles
   if (!message.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
-    return message.channel.send({
-      embeds: [new EmbedBuilder()
-        .setTitle('❌ Unauthorized')
-        .setDescription('You need the Manage Roles permission to use this command.')
-        .setColor('Red')]
-    });
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('Unauthorized', 'You need the Manage Roles permission to use this command.')],
+      },
+    };
   }
 
   if (args.length < 2) {
-    return message.channel.send({
-      embeds: [new EmbedBuilder()
-        .setTitle('❌ Invalid Usage')
-        .setDescription('Usage: $derole @user @role')
-        .setColor('Yellow')]
-    });
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('Invalid Usage', 'Usage: $derole @user @role')],
+      },
+    };
   }
 
   const userMention = args[0];
@@ -35,78 +37,109 @@ export async function execute(message, args) {
   const role = message.guild.roles.cache.get(roleId);
 
   if (!member) {
-    return message.channel.send({
-      embeds: [new EmbedBuilder()
-        .setTitle('❌ Invalid User')
-        .setDescription('Please mention a valid user.')
-        .setColor('Red')]
-    });
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('Invalid User', 'Please mention a valid user.')],
+      },
+    };
   }
 
   if (!role) {
-    return message.channel.send({
-      embeds: [new EmbedBuilder()
-        .setTitle('❌ Invalid Role')
-        .setDescription('Please mention a valid role.')
-        .setColor('Red')]
-    });
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('Invalid Role', 'Please mention a valid role.')],
+      },
+    };
   }
 
   if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
-    return message.channel.send({
-      embeds: [new EmbedBuilder()
-        .setTitle('❌ Missing Permission')
-        .setDescription('I need Manage Roles permission to do that.')
-        .setColor('Red')]
-    });
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('Missing Permission', 'I need Manage Roles permission to do that.')],
+      },
+    };
   }
 
   // Check role hierarchy (bot)
   const botHighestRole = message.guild.members.me.roles.highest;
   if (role.position >= botHighestRole.position) {
-    return message.channel.send({
-      embeds: [new EmbedBuilder()
-        .setTitle('❌ Role Hierarchy Error')
-        .setDescription('I cannot manage a role higher or equal to my highest role.')
-        .setColor('Red')]
-    });
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Role Hierarchy Error',
+            'I cannot manage a role higher or equal to my highest role.'
+          ),
+        ],
+      },
+    };
   }
 
   // Check role hierarchy (author)
   const authorHighestRole = message.member.roles.highest;
   if (role.position >= authorHighestRole.position) {
-    return message.channel.send({
-      embeds: [new EmbedBuilder()
-        .setTitle('❌ Role Hierarchy Error')
-        .setDescription('You cannot manage a role higher or equal to your highest role.')
-        .setColor('Red')]
-    });
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Role Hierarchy Error',
+            'You cannot manage a role higher or equal to your highest role.'
+          ),
+        ],
+      },
+    };
   }
 
   try {
     if (!member.roles.cache.has(role.id)) {
-      return message.channel.send({
-        embeds: [new EmbedBuilder()
-          .setTitle('ℹ️ Role Not Assigned')
-          .setDescription(`${member.user.tag} does not have the role ${role.name}.`)
-          .setColor('Yellow')]
-      });
+      return {
+        reply: {
+          embeds: [
+            cmdResponseEmbed(
+              'Role Not Assigned',
+              `${member.user.tag} does not have the role ${role.name}.`,
+              'Yellow'
+            ),
+          ],
+        },
+      };
     }
 
     await member.roles.remove(role);
-    await message.channel.send({
-      embeds: [new EmbedBuilder()
-        .setTitle('✅ Role Removed')
-        .setDescription(`Removed role ${role.name} from ${member.user.tag}.`)
-        .setColor('Green')]
-    });
+
+    return {
+      reply: {
+        embeds: [
+          cmdResponseEmbed(
+            'Role Removed',
+            `Removed role ${role.name} from ${member.user.tag}.`,
+            'Green'
+          ),
+        ],
+      },
+      log: {
+        action: 'derole',
+        targetUserId: member.id,
+        targetTag: member.user.tag,
+        executorUserId: message.author.id,
+        executorTag: message.author.tag,
+        guildId: message.guild.id,
+        roleId: role.id,
+        roleName: role.name,
+        timestamp: new Date().toISOString(),
+      },
+    };
   } catch (error) {
     console.error('Error removing role:', error);
-    await message.channel.send({
-      embeds: [new EmbedBuilder()
-        .setTitle('❌ Error')
-        .setDescription('There was an error removing the role. Check my permissions and role hierarchy.')
-        .setColor('Red')]
-    });
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Error',
+            'There was an error removing the role. Check my permissions and role hierarchy.'
+          ),
+        ],
+      },
+    };
   }
-}
+};

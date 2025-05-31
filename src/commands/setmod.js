@@ -1,5 +1,7 @@
-import { EmbedBuilder } from 'discord.js';
-import supabase from './src/supabaseClient'
+import supabase from './src/supabaseClient';
+import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embedHelpers.js';
+
+export const permissionLevel = 'Admin';
 
 export default {
   name: 'setmod',
@@ -7,32 +9,20 @@ export default {
   async execute(message, args) {
     if (!message.member.permissions.has('Administrator')) {
       return message.channel.send({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle('❌ Permission Denied')
-            .setDescription('You need Administrator permission to set the mod role.')
-            .setColor('Red')
-        ]
+        embeds: [cmdErrorEmbed('❌ Permission Denied', 'You need Administrator permission to set the mod role.')]
       });
     }
 
     const role = message.mentions.roles.first();
     if (!role) {
       return message.channel.send({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle('❌ Invalid Role')
-            .setDescription('Please mention a valid role. Usage: `$setmod @role`')
-            .setColor('Red')
-        ]
+        embeds: [cmdErrorEmbed('❌ Invalid Role', 'Please mention a valid role. Usage: `$setmod @role`')]
       });
     }
 
-    // Save to Supabase: key by guild ID
     const guildId = message.guild.id;
 
-    // Upsert mod role for guild
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('guild_settings')
       .upsert({ guild_id: guildId, mod_role_id: role.id })
       .eq('guild_id', guildId);
@@ -40,22 +30,20 @@ export default {
     if (error) {
       console.error(error);
       return message.channel.send({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle('❌ Database Error')
-            .setDescription('Failed to save the mod role. Please try again later.')
-            .setColor('Red')
-        ]
+        embeds: [cmdErrorEmbed('❌ Database Error', 'Failed to save the mod role. Please try again later.')]
       });
     }
 
     message.channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle('✅ Moderator Role Set')
-          .setDescription(`Moderator role has been set to ${role.name}.`)
-          .setColor('Green')
-      ]
+      embeds: [cmdResponseEmbed('✅ Moderator Role Set', `Moderator role has been set to ${role.name}.`)]
     });
+
+    return {
+      action: 'setModRole',
+      roleId: role.id,
+      roleName: role.name,
+      moderatorId: message.author.id,
+      moderatorTag: message.author.tag,
+    };
   }
 };

@@ -1,52 +1,74 @@
-// src/utils/modlog.js
-
 import { EmbedBuilder } from 'discord.js';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import timezone from 'dayjs/plugin/timezone.js';
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
-/**
- * Logs a moderation action to the mod log channel.
- * 
- * @param {Client} client - Your Discord client
- * @param {string} guildId - ID of the guild where action happened
- * @param {Object} supabase - Supabase client instance
- * @param {string} action - Action name (e.g., "Ban", "Kick", "Mute")
- * @param {GuildMember} target - The user who the action was done on
- * @param {GuildMember} moderator - The user who performed the action
- * @param {string} reason - Reason for the action
- * @param {boolean} success - Whether the action succeeded
- * @param {boolean} inModCh - Whether the command was run in mod channel
- */
-async function logModAction(client, guildId, supabase, action, target, moderator, reason, success, inModCh) {
+export async function logCommand({
+  client,
+  supabase,
+  message,
+  commandName,
+  reason = null,
+  targetUserId = null,
+  isModch = false,
+}) {
+  const guildId = message.guild.id;
+  const usedBy = message.author;
+  const usedInChannel = message.channel;
+
+  // Format IST time
+  const usedAt = dayjs().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
+
+  // Build embed
+  const embed = new EmbedBuilder()
+    .setColor(0x0099ff)
+    .setTitle('Command Executed')
+    .addFields(
+      { name: 'Command', value: commandName, inline: true },
+      { name: 'Used By', value: `${usedBy.tag} (${usedBy.id})`, inline: true },
+      { name: 'Target User', value: targetUserId ? `<@${targetUserId}>` : 'N/A', inline: true },
+      { name: 'Used At (IST)', value: usedAt, inline: true },
+      { name: 'Channel', value: `${usedInChannel.name} (${usedInChannel.id})`, inline: true },
+      { name: 'Used In Modch?', value: isModch ? 'Yes' : 'No', inline: true },
+    );
+
+  if (reason) {
+    embed.addFields({ name: 'Reason', value: reason });
+  }
+
+  // Send embed to modlog channel if set
   try {
-    // Get modlog channel ID from Supabase
-    let { data, error } = await supabase
+    const { data: guildSettings } = await supabase
       .from('guild_settings')
-      .select('modlog_channel')
+      .select('modlog_channel_id')
       .eq('guild_id', guildId)
       .single();
 
-    if (error || !data?.modlog_channel) return;
-
-    const modlogChannel = await client.channels.fetch(data.modlog_channel).catch(() => null);
-    if (!modlogChannel) return;
-
-    const embed = new EmbedBuilder()
-      .setTitle(`Moderation Action: ${action}`)
-      .setColor(success ? 0x2ecc71 : 0xe74c3c) // green if success else red
-      .addFields(
-        { name: 'User', value: `${target.user.tag} (${target.id})`, inline: true },
-        { name: 'Moderator', value: `${moderator.user.tag} (${moderator.id})`, inline: true },
-        { name: 'Reason', value: reason || 'No reason provided', inline: false },
-        { name: 'Success', value: success ? 'Yes' : 'No', inline: true },
-        { name: 'In Mod Channel', value: inModCh ? 'Yes' : 'No', inline: true },
-        { name: 'Timestamp', value: new Date().toUTCString(), inline: false }
-      )
-      .setFooter({ text: `User ID: ${target.id}` })
-      .setTimestamp();
-
-    modlogChannel.send({ embeds: [embed] });
+    if (guildSettings?.modlog_channel_id) {
+      const modlogChannel = client.channels.cache.get(guildSettings.modlog_channel_id);
+      if (modlogChannel) {
+        await modlogChannel.send({ embeds: [embed] });
+      }
+    }
   } catch (err) {
-    console.error('Failed to log moderation action:', err);
+    console.error('Error sending modlog embed:', err);
+  }
+
+  // Insert backup log into Supabase
+  try {
+    await supabase.from('log_backup').upsert({
+      guild_id: guildId,
+      command_used: commandName,
+      reason: reason,
+      command_user: usedBy.id,
+      target_user: targetUserId,
+      used_at: usedAt,
+      used_in: new Date(message.createdTimestamp),
+      is_modch: isModch,
+    }, { onConflict: 'guild_id' });
+  } catch (err) {
+    console.error('Error inserting log_backup:', err);
   }
 }
-
-export default logModAction;

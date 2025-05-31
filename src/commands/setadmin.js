@@ -1,5 +1,7 @@
-import { EmbedBuilder } from 'discord.js';
-import supabase from './src/supabaseClient'
+import supabase from './src/supabaseClient';
+import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embedHelpers.js';
+
+export const permissionLevel = 'Admin';
 
 export default {
   name: 'setadmin',
@@ -7,30 +9,20 @@ export default {
   async execute(message, args) {
     if (!message.member.permissions.has('Administrator')) {
       return message.channel.send({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle('❌ Permission Denied')
-            .setDescription('You need Administrator permission to set the admin role.')
-            .setColor('Red')
-        ]
+        embeds: [cmdErrorEmbed('❌ Permission Denied', 'You need Administrator permission to set the admin role.')]
       });
     }
 
     const role = message.mentions.roles.first();
     if (!role) {
       return message.channel.send({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle('❌ Invalid Role')
-            .setDescription('Please mention a valid role. Usage: `$setadmin @role`')
-            .setColor('Red')
-        ]
+        embeds: [cmdErrorEmbed('❌ Invalid Role', 'Please mention a valid role. Usage: `$setadmin @role`')]
       });
     }
 
     const guildId = message.guild.id;
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('guild_settings')
       .upsert({ guild_id: guildId, admin_role_id: role.id })
       .eq('guild_id', guildId);
@@ -38,22 +30,20 @@ export default {
     if (error) {
       console.error(error);
       return message.channel.send({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle('❌ Database Error')
-            .setDescription('Failed to save the admin role. Please try again later.')
-            .setColor('Red')
-        ]
+        embeds: [cmdErrorEmbed('❌ Database Error', 'Failed to save the admin role. Please try again later.')]
       });
     }
 
     message.channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle('✅ Administrator Role Set')
-          .setDescription(`Administrator role has been set to ${role.name}.`)
-          .setColor('Green')
-      ]
+      embeds: [cmdResponseEmbed('✅ Administrator Role Set', `Administrator role has been set to ${role.name}.`)]
     });
+
+    return {
+      action: 'setAdminRole',
+      roleId: role.id,
+      roleName: role.name,
+      moderatorId: message.author.id,
+      moderatorTag: message.author.tag,
+    };
   }
 };

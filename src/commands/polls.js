@@ -1,20 +1,78 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import supabase from './src/supabaseClient'
-import { isModerator } from '../utils/permissions';
+import { EmbedBuilder } from 'discord.js';
+import supabase from './src/supabaseClient.js';
+import { isModerator } from '../utils/permissions.js';
+
+export const permissionLevel = 'Mod';
 
 export default {
-  name: 'poll',
+  name: 'polls',
+  description: 'Create or conclude polls using advanced syntax.',
+  usage: '$polls #channel msg("Poll question") options((emoji:"Text"), ...) config(multiple=true/false)\n$polls #channel msgId("message_id") conclude',
+  
   async execute(message, args) {
     const guildId = message.guild.id;
     const authorId = message.author.id;
 
     if (!await isModerator(message.member)) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor('Red').setDescription("❌ You don't have permission to use this command.")] });
+      return message.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setDescription("❌ You don't have permission to use this command."),
+        ],
+      });
     }
 
-    // Conclude command
-    if (args.length === 2 && args[1] === 'conclude') {
-      const messageId = args[0];
+    // Helper to parse quoted content inside parentheses, e.g. msg("text")
+    function parseParenArg(str, key) {
+      const regex = new RegExp(`${key}\\("([^"]+)"\\)`);
+      const match = str.match(regex);
+      return match ? match[1] : null;
+    }
+
+    // Helper to parse options((emoji:"Text"), (emoji:"Text"))
+    function parseOptions(str) {
+      const regex = /(?:\(([^:]+):"([^"]+)"\))/g;
+      const options = [];
+      let match;
+      while ((match = regex.exec(str)) !== null) {
+        options.push({ emoji: match[1].trim(), text: match[2].trim() });
+      }
+      return options;
+    }
+
+    // Helper to parse config(multiple=true/false)
+    function parseConfig(str) {
+      const regex = /config\(multiple=(true|false)\)/;
+      const match = str.match(regex);
+      if (!match) return { multiple: true };
+      return { multiple: match[1] === 'true' };
+    }
+
+    // Check if concluding poll: $polls #channel msgId("message_id") conclude
+    if (args.length >= 3 && args[2].toLowerCase() === 'conclude') {
+      const channelMention = args[0];
+      const msgIdArg = args[1];
+
+      // Extract message ID from msgId("...")
+      const messageId = parseParenArg(msgIdArg, 'msgId');
+      if (!messageId) {
+        return message.reply({
+          embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Invalid msgId format. Use msgId("message_id")')],
+        });
+      }
+
+      // Get channel from mention
+      const channelId = channelMention.replace(/[<#>]/g, '');
+      const channel = await message.guild.channels.fetch(channelId).catch(() => null);
+
+      if (!channel) {
+        return message.reply({
+          embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Invalid channel mention.')],
+        });
+      }
+
+      // Fetch poll from DB
       const { data, error } = await supabase
         .from('polls')
         .select('*')
@@ -23,13 +81,13 @@ export default {
         .single();
 
       if (error || !data) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ No such poll found.')] });
+        return message.reply({
+          embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ No such poll found.')],
+        });
       }
 
       try {
-        const channel = await message.guild.channels.fetch(data.channel_id);
         const pollMessage = await channel.messages.fetch(data.message_id);
-
         const reactions = pollMessage.reactions.cache;
         const results = [];
 
@@ -39,78 +97,93 @@ export default {
         }
 
         const sorted = results.sort((a, b) => b.count - a.count);
-        const stats = sorted.map(r => `${r.emoji}: ${r.count}`).join('\n');
+        const stats = sorted.map(r => `${r.emoji}: ${r.count}`).join('\n') || 'No votes';
 
         const resultEmbed = new EmbedBuilder()
           .setTitle('📊 Poll Results')
           .setDescription(data.title)
-          .addFields({ name: 'Results', value: stats || 'No votes' })
+          .addFields({ name: 'Results', value: stats })
           .setFooter({ text: `Poll started at: ${new Date(data.created_at).toLocaleString()}` })
           .setColor('Blue');
 
         await pollMessage.delete();
         await channel.send({ embeds: [resultEmbed] });
         await supabase.from('polls').delete().eq('message_id', messageId);
+
+        return {
+          action: 'concludePoll',
+          pollTitle: data.title,
+          channelId: channel.id,
+          messageId: messageId,
+          concludedBy: authorId,
+        };
       } catch (err) {
         console.error('Error concluding poll:', err);
+        return message.reply({
+          embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Error concluding poll.')],
+        });
       }
-
-      return;
     }
 
-    // Create poll
-    const channel = message.mentions.channels.first();
+    // Otherwise, creating a poll:
+    // Syntax example:
+    // $polls #channel msg("Question?") options((👍:"Yes"), (👎:"No")) config(multiple=false)
+    if (args.length < 3) {
+      return message.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setDescription('❌ Invalid command syntax.'),
+        ],
+      });
+    }
+
+    // Parse channel mention
+    const channelMention = args[0];
+    const channelId = channelMention.replace(/[<#>]/g, '');
+    const channel = await message.guild.channels.fetch(channelId).catch(() => null);
     if (!channel) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Please mention a channel.')] });
+      return message.reply({
+        embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Invalid channel mention.')],
+      });
     }
 
-    // Simple text-based setup (can later replace with modal/buttons)
-    const filter = m => m.author.id === message.author.id;
+    // Join the rest of the args into a single string to parse msg(), options(), config()
+    const argsStr = args.slice(1).join(' ');
 
-    message.channel.send('📝 Enter the poll question (you have 60s):');
-    const collectedQuestion = await message.channel.awaitMessages({ filter, max: 1, time: 60000 });
-    if (!collectedQuestion.size) return message.channel.send('⏱️ Time expired.');
-
-    const title = collectedQuestion.first().content;
-
-    message.channel.send('🔢 Enter options in the format:\n`emoji Option text` (one per line, max 16). Type `done` when finished.');
-    const collectedOptions = [];
-    while (collectedOptions.length < 16) {
-      const collected = await message.channel.awaitMessages({ filter, max: 1, time: 60000 });
-      if (!collected.size) return message.channel.send('⏱️ Time expired.');
-      const content = collected.first().content;
-      if (content.toLowerCase() === 'done') break;
-
-      const match = content.match(/^(\S+)\s+(.+)$/);
-      if (!match) {
-        message.channel.send('❌ Format must be `emoji Option text`. Try again.');
-        continue;
-      }
-
-      const [_, emoji, text] = match;
-      collectedOptions.push({ emoji, text });
+    // Parse poll question
+    const pollQuestion = parseParenArg(argsStr, 'msg');
+    if (!pollQuestion) {
+      return message.reply({
+        embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Missing or invalid poll question. Use msg("Your question")')],
+      });
     }
 
-    if (collectedOptions.length < 2) {
-      return message.channel.send('❌ You must enter at least 2 options.');
+    // Parse options
+    const options = parseOptions(argsStr);
+    if (options.length < 2) {
+      return message.reply({
+        embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ You must specify at least 2 options.')],
+      });
     }
 
-    // Ask if multiselect
-    message.channel.send('✅ Should the poll allow multiple choices? (yes/no)');
-    const multiMsg = await message.channel.awaitMessages({ filter, max: 1, time: 30000 });
-    const isMulti = multiMsg.first()?.content.toLowerCase().startsWith('y') ?? true;
+    // Parse config
+    const config = parseConfig(argsStr);
+    const isMulti = config.multiple ?? true;
 
-    // Create embed and message
+    // Create poll embed
     const embed = new EmbedBuilder()
       .setTitle('🗳️ New Poll')
-      .setDescription(title)
-      .addFields(collectedOptions.map(opt => ({ name: opt.emoji, value: opt.text, inline: true })))
+      .setDescription(pollQuestion)
+      .addFields(options.map(opt => ({ name: opt.emoji, value: opt.text, inline: true })))
       .setFooter({ text: isMulti ? 'Users can vote for multiple options.' : 'Users can vote only once.' })
       .setColor('Green');
 
+    // Send poll message
     const pollMessage = await channel.send({ embeds: [embed] });
 
-    for (const { emoji } of collectedOptions) {
+    // React with emojis
+    for (const { emoji } of options) {
       try {
         await pollMessage.react(emoji);
       } catch (err) {
@@ -123,11 +196,21 @@ export default {
       guild_id: guildId,
       channel_id: channel.id,
       message_id: pollMessage.id,
-      title,
-      options: collectedOptions,
+      title: pollQuestion,
+      options,
       is_multi: isMulti,
     });
 
     message.channel.send('✅ Poll created successfully!');
+
+    return {
+      action: 'createPoll',
+      pollTitle: pollQuestion,
+      channelId: channel.id,
+      messageId: pollMessage.id,
+      options,
+      isMulti,
+      createdBy: authorId,
+    };
   },
 };

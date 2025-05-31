@@ -1,4 +1,6 @@
-// src/commands/kick.js
+import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embedHelpers.js';
+
+export const permissionLevel = 'Mod';
 
 export default {
   name: 'kick',
@@ -17,72 +19,83 @@ export default {
 
     if (error) {
       console.error(error);
-      return message.reply({
-        embeds: [{ color: 0xff0000, description: '❌ Database error fetching roles.' }],
-      });
+      return {
+        reply: { embeds: [cmdErrorEmbed('Database Error', '❌ Database error fetching roles.')] },
+      };
     }
 
     const modRoleId = settings?.mod_role_id;
     const adminRoleId = settings?.admin_role_id;
 
     if (!modRoleId) {
-      return message.reply({
-        embeds: [{ color: 0xff0000, description: '❌ Mod role not set. Use `$setmod @role` first.' }],
-      });
+      return {
+        reply: { embeds: [cmdErrorEmbed('Configuration Error', '❌ Mod role not set. Use `$setmod @role` first.')] },
+      };
     }
 
     // Check if user is mod or admin
     if (
       !member.roles.cache.has(modRoleId) &&
       !member.roles.cache.has(adminRoleId) &&
-      !member.permissions.has('ADMINISTRATOR')
+      !member.permissions.has('Administrator')
     ) {
-      return message.reply({
-        embeds: [{ color: 0xff0000, description: '❌ You do not have permission to kick users.' }],
-      });
+      return {
+        reply: { embeds: [cmdErrorEmbed('Permission Denied', '❌ You do not have permission to kick users.')] },
+      };
     }
 
     if (args.length < 1) {
-      return message.reply({
-        embeds: [{ color: 0xff0000, description: '❌ Please mention a user to kick.' }],
-      });
+      return {
+        reply: { embeds: [cmdErrorEmbed('Invalid Usage', '❌ Please mention a user to kick.')] },
+      };
     }
 
     // Get target user from mention
     const target = message.mentions.members.first();
     if (!target) {
-      return message.reply({
-        embeds: [{ color: 0xff0000, description: '❌ Please mention a valid user.' }],
-      });
+      return {
+        reply: { embeds: [cmdErrorEmbed('Invalid User', '❌ Please mention a valid user.')] },
+      };
     }
 
-    // Check if target is server owner ("king")
+    // Check if target is server owner
     if (target.id === guild.ownerId) {
-      return message.reply({
-        embeds: [{ color: 0xff0000, description: '❌ Cannot kick the server owner.' }],
-      });
+      return {
+        reply: { embeds: [cmdErrorEmbed('Invalid Action', '❌ Cannot kick the server owner.')] },
+      };
     }
 
     // Check that target is lower than command user in role hierarchy
     if (target.roles.highest.position >= member.roles.highest.position && message.author.id !== guild.ownerId) {
-      return message.reply({
-        embeds: [{ color: 0xff0000, description: '❌ You cannot kick someone with equal or higher role.' }],
-      });
+      return {
+        reply: { embeds: [cmdErrorEmbed('Role Hierarchy', '❌ You cannot kick someone with equal or higher role.')] },
+      };
     }
 
     try {
       await target.kick(`Kicked by ${message.author.tag}`);
-      return message.reply({
-        embeds: [{
-          color: 0x00ff00,
-          description: `👢 Kicked ${target.user.tag} successfully.`,
-        }],
-      });
+
+      // Return success reply and data for logCommand
+      return {
+        reply: {
+          embeds: [cmdResponseEmbed('User Kicked', `👢 Kicked ${target.user.tag} successfully.`)],
+        },
+        log: {
+          action: 'kick',
+          targetUserId: target.id,
+          targetTag: target.user.tag,
+          executorUserId: message.author.id,
+          executorTag: message.author.tag,
+          guildId: guild.id,
+          reason: `Kicked by ${message.author.tag}`,
+          timestamp: new Date().toISOString(),
+        },
+      };
     } catch (err) {
       console.error(err);
-      return message.reply({
-        embeds: [{ color: 0xff0000, description: '❌ Failed to kick the user. Check bot permissions.' }],
-      });
+      return {
+        reply: { embeds: [cmdErrorEmbed('Error', '❌ Failed to kick the user. Check bot permissions.')] },
+      };
     }
   },
 };

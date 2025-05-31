@@ -1,5 +1,7 @@
 // src/commands/mute.js
 
+export const permissionLevel = 'Moderator';
+
 export default {
   name: 'mute',
   description: 'Mute a user for a specified duration (1min to 24hrs). Default is 2 mins. Moderator-level command.',
@@ -161,6 +163,11 @@ export default {
         description: `🔇 Muted ${target.user.tag} for ${durationMs / 60000} minutes.`,
       }],
     });
+
+    return {
+    reason: `Muted ${target.user.tag} for ${durationMs / 60000} minutes.`,
+      targetUserId: target.id,
+    };
 
     // Remove mute after duration
     setTimeout(async () => {

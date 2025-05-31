@@ -13,9 +13,11 @@ function hasRoleOrHigher(member, roleId) {
   const role = member.guild.roles.cache.get(roleId);
   if (!role) return false;
 
-  // Check if member has the role or any role with higher position
-  const memberHighest = member.roles.highest;
-  return member.roles.cache.has(roleId) || memberHighest.position > role.position;
+  // Member's highest role position
+  const memberHighestPosition = member.roles.highest.position;
+
+  // Return true if the member has the role or any role higher or equal to the role
+  return member.roles.cache.has(roleId) || memberHighestPosition >= role.position;
 }
 
 /**

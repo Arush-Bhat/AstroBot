@@ -1,108 +1,134 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, StringSelectMenuBuilder, PermissionsBitField } from 'discord.js';
-import { getModPermissions } from '../utils/permissions';
-import { createClient } from './src/supabaseClient'
-import supabase from './src/supabaseClient'
+import { EmbedBuilder } from 'discord.js';
+import supabase from './src/supabaseClient.js';
+import { getModPermissions } from '../utils/permissions.js';
+
+export const permissionLevel = 'Mod';
 
 export default {
-  name: 'reactrole',
-  async execute(message, args, client) {
+  name: 'reactroles',
+  description: 'Create a reaction role message with advanced syntax.',
+  usage: '$reactroles #channel msg("Text") roles((emoji:@role), ...) config(toggle=true/false)',
+  
+  async execute(message, args) {
     const { isMod, errorEmbed } = await getModPermissions(message, supabase);
     if (!isMod) return message.reply({ embeds: [errorEmbed], ephemeral: true });
 
-    const targetChannel = message.mentions.channels.first();
-    if (!targetChannel || targetChannel.type !== ChannelType.GuildText) {
-      return message.reply('Please mention a valid text channel.');
+    if (args.length < 3) {
+      return message.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setDescription('❌ Invalid command syntax.'),
+        ],
+      });
     }
 
-    // Step 1: Ask for message text
-    const embed = new EmbedBuilder()
-      .setTitle('Reaction Role Setup')
-      .setDescription('Please reply with the message text for the reaction role.')
-      .setColor(0x3498db);
+    // Helper to parse quoted content inside parentheses, e.g. msg("text")
+    function parseParenArg(str, key) {
+      const regex = new RegExp(`${key}\\("([^"]+)"\\)`);
+      const match = str.match(regex);
+      return match ? match[1] : null;
+    }
 
-    await message.reply({ embeds: [embed] });
-
-    const textFilter = m => m.author.id === message.author.id;
-    const collectedText = await message.channel.awaitMessages({ filter: textFilter, max: 1, time: 30000 });
-    if (!collectedText.size) return message.reply('Timeout. No message text received.');
-
-    const messageText = collectedText.first().content;
-
-    // Step 2: Ask for toggle mode
-    const toggleEmbed = new EmbedBuilder()
-      .setTitle('Togglable Reaction Role?')
-      .setDescription('Should selecting the emoji again remove the role? Click a button below.')
-      .setColor(0x2ecc71);
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('toggle_on').setLabel('Yes').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('toggle_off').setLabel('No').setStyle(ButtonStyle.Danger)
-    );
-
-    const toggleMsg = await message.channel.send({ embeds: [toggleEmbed], components: [row] });
-
-    const toggleInteraction = await toggleMsg.awaitMessageComponent({ time: 30000 });
-    const togglable = toggleInteraction.customId === 'toggle_on';
-    await toggleInteraction.update({ content: `Toggle mode set to: ${togglable ? 'ON' : 'OFF'}`, components: [] });
-
-    // Step 3: Ask for emoji-role mappings
-    const mappings = {};
-    const addEmbed = new EmbedBuilder()
-      .setTitle('Add Reaction Roles')
-      .setDescription('Reply with: `emoji @role` (one per message). Type `done` when finished.')
-      .setColor(0xf1c40f);
-
-    await message.channel.send({ embeds: [addEmbed] });
-
-    const roleCollector = message.channel.createMessageCollector({ filter: textFilter, time: 120000 });
-
-    roleCollector.on('collect', msg => {
-      if (msg.content.toLowerCase() === 'done') return roleCollector.stop();
-
-      const parts = msg.content.trim().split(/\s+/);
-      const emoji = parts[0];
-      const role = msg.mentions.roles.first();
-
-      if (!emoji || !role) {
-        msg.reply('Invalid format. Use: `emoji @role`');
-        return;
+    // Helper to parse roles((emoji:@role), ...)
+    function parseRoles(str) {
+      const regex = /\(([^:]+):(<@&\d+>)\)/g;
+      const mappings = {};
+      let match;
+      while ((match = regex.exec(str)) !== null) {
+        const emoji = match[1].trim();
+        const roleMention = match[2];
+        mappings[emoji] = roleMention;
       }
+      return mappings;
+    }
 
-      mappings[emoji] = role.id;
-      msg.react('✅');
-    });
+    // Helper to parse config(toggle=true/false)
+    function parseConfig(str) {
+      const regex = /config\(toggle=(true|false)\)/;
+      const match = str.match(regex);
+      return match ? match[1] === 'true' : false;
+    }
 
-    roleCollector.on('end', async () => {
-      if (Object.keys(mappings).length === 0) {
-        return message.reply('No roles added. Cancelling setup.');
-      }
-
-      // Step 4: Send the reaction role message
-      const post = await targetChannel.send(messageText);
-
-      for (const emoji of Object.keys(mappings)) {
-        try {
-          await post.react(emoji);
-        } catch (err) {
-          console.warn(`Failed to react with emoji ${emoji}`, err);
-        }
-      }
-
-      // Save to Supabase
-      const { error } = await supabase.from('reaction_roles').insert({
-        guild_id: message.guild.id,
-        channel_id: targetChannel.id,
-        message_id: post.id,
-        roles: mappings,
-        togglable: togglable,
+    // Parse channel mention
+    const channelMention = args[0];
+    const channelId = channelMention.replace(/[<#>]/g, '');
+    const channel = await message.guild.channels.fetch(channelId).catch(() => null);
+    if (!channel || !channel.isText()) {
+      return message.reply({
+        embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Invalid channel mention or not a text channel.')],
       });
+    }
 
-      if (error) {
-        console.error('Failed to save reaction role message:', error);
-        return message.reply('Saved message failed. Please try again.');
+    // Join rest of args for parsing msg(), roles(), config()
+    const argsStr = args.slice(1).join(' ');
+
+    // Parse message text
+    const messageText = parseParenArg(argsStr, 'msg');
+    if (!messageText) {
+      return message.reply({
+        embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Missing or invalid msg(). Use msg("Your text")')],
+      });
+    }
+
+    // Parse roles mapping
+    const roleMappingsRaw = parseRoles(argsStr);
+    if (Object.keys(roleMappingsRaw).length === 0) {
+      return message.reply({
+        embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ You must specify at least one role mapping. Use roles((emoji:@role), ...)')],
+      });
+    }
+
+    // Convert role mentions to IDs and validate
+    const mappings = {};
+    for (const [emoji, roleMention] of Object.entries(roleMappingsRaw)) {
+      const roleId = roleMention.replace(/[<@&>]/g, '');
+      const role = message.guild.roles.cache.get(roleId);
+      if (!role) {
+        return message.reply({
+          embeds: [new EmbedBuilder().setColor('Red').setDescription(`❌ Invalid role mention: ${roleMention}`)],
+        });
       }
+      mappings[emoji] = role.id;
+    }
 
-      return message.reply('Reaction role message successfully created and saved!');
+    // Parse toggle config (default false)
+    const togglable = parseConfig(argsStr);
+
+    // Send the reaction role message
+    const post = await channel.send(messageText);
+
+    for (const emoji of Object.keys(mappings)) {
+      try {
+        await post.react(emoji);
+      } catch (err) {
+        console.warn(`Failed to react with emoji ${emoji}`, err);
+      }
+    }
+
+    // Save to Supabase
+    const { error } = await supabase.from('reaction_roles').insert({
+      guild_id: message.guild.id,
+      channel_id: channel.id,
+      message_id: post.id,
+      roles: mappings,
+      togglable,
     });
+
+    if (error) {
+      console.error('Failed to save reaction role message:', error);
+      return message.reply('❌ Failed to save reaction role message. Please try again.');
+    }
+
+    await message.reply('✅ Reaction role message successfully created and saved!');
+
+    return {
+      action: 'createReactRole',
+      channelId: channel.id,
+      messageId: post.id,
+      mappings,
+      togglable,
+      createdBy: message.author.id,
+    };
   },
 };
