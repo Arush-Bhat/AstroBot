@@ -1,4 +1,4 @@
-import { cmdErrorEmbed, cmdWarningEmbed, cmdResponseEmbed } from '../utils/embedHelpers.js';
+import { cmdErrorEmbed, cmdWarningEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 import { PermissionsBitField } from 'discord.js';
 
 const permissionLevel = 'Mod';

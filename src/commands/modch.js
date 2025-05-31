@@ -1,4 +1,4 @@
-import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embedHelpers.js';
+import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 
 const permissionLevel = 'Admin';
 
