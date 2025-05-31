@@ -1,6 +1,7 @@
 import { EmbedBuilder } from 'discord.js';
 import supabase from '../supabaseClient.js';
 import { getModPermissions } from '../utils/permissions.js';
+import { isModerator } from '../utils/permissions.js';
 
 const permissionLevel = 'Mod';
 
@@ -11,8 +12,24 @@ const data = {
 };
 
 async function execute(message, args) {
-  const { isMod, errorEmbed } = await getModPermissions(message, supabase);
-  if (!isMod) return message.reply({ embeds: [errorEmbed], ephemeral: true });
+  const { data: config } = await supabase
+    .from('config')
+    .select('mod_role_id, admin_role_id')
+    .eq('guild_id', message.guild.id)
+    .single();
+
+  if (!config) {
+    return message.reply({
+      embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Server is not configured. Use `$setup` first.')],
+    });
+  }
+
+  const isMod = isModerator(message.member, config.mod_role_id, config.admin_role_id);
+  if (!isMod) {
+    return message.reply({
+      embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ You do not have permission to use this command.')],
+    });
+  }
 
   if (args.length < 3) {
     return message.reply({
