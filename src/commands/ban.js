@@ -4,7 +4,7 @@ import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 
 const permissionLevel = 'Admin';
 
-data = {
+const data = {
   name: 'ban',
   description: 'Ban a user from the server. Administrator-level command.',
   usage: '$ban @user reason(Spamming in chat)',

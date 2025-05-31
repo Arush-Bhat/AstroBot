@@ -1,6 +1,6 @@
 import supabase from '../supabaseClient.js';
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embedHelpers.js';
-import { isModerator } from '../utils/permissions';
+import { isModerator, canManageRole } from '../utils/permissions.js';
 
 const permissionLevel = 'Mod';
 
