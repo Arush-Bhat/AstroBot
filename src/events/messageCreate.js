@@ -1,5 +1,6 @@
 import supabase from './src/supabaseClient';
 import { EmbedBuilder } from 'discord.js';
+import { client } from '../index.js'; 
 
 client.on('messageCreate', async message => {
   if (message.author.bot) return;
@@ -53,8 +54,8 @@ client.on('messageCreate', async message => {
   }
 
   // Define which commands require mod/admin roles (you can expand this)
-  const adminCommands = ['setadmin', /* other admin-level commands */];
-  const modCommands = ['setmod', /* other mod-level commands */];
+  const adminCommands = ['setadmin', 'ban', 'kick', 'mute', 'modlog' /* other admin-level commands */];
+  const modCommands = ['setmod', 'modch', 'mute', 'kick', 'role', 'derole' /* other mod-level commands */];
 
   // Check permissions for admin commands
   if (adminCommands.includes(commandName)) {
