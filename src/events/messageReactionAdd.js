@@ -1,5 +1,5 @@
 import { Events } from 'discord.js';
-import supabase from '../supabaseClient.js';
+import { supabase } from '../supabaseClient.js';
 
 export default {
   name: Events.MessageReactionAdd,

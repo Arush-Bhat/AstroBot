@@ -1,4 +1,4 @@
-import supabase from './src/supabaseClient.js';
+import { supabase } from '../supabaseClient.js';
 
 export default {
   name: 'messageReactionRemove',

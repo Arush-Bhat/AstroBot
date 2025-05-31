@@ -1,4 +1,4 @@
-import supabase from './src/supabaseClient';
+import { supabase } from '../supabaseClient.js';
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embedHelpers.js';
 
 const permissionLevel = 'Admin';
