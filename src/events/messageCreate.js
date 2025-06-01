@@ -37,6 +37,7 @@ export default async function messageCreate(message, client) {
 
   const modchId = guildSettings?.modch_channel_id;
   const isModch = message.channel.id === modchId;
+  console.log(isModch);
 
   // Block commands if mod/admin roles are missing
   if (
@@ -80,7 +81,7 @@ export default async function messageCreate(message, client) {
     const result = await command.execute(client, message, args, supabase);
 
     // Delete original message if not in modch (and not the modch command itself)
-    if (!isModch && commandName !== 'modch') {
+    if (!isModch) {
       await message.delete().catch(() => {});
     }
 
@@ -88,7 +89,7 @@ export default async function messageCreate(message, client) {
     if (result?.reply) {
       const modchChannel = message.guild.channels.cache.get(modchId);
 
-      if (isModch || commandName === 'modch') {
+      if (isModch || !modchId) {
         await message.reply(result.reply);
       } else if (modchChannel?.isTextBased()) {
         console.log(`✅ Sending command output to modch channel: ${modchChannel.name}`);
