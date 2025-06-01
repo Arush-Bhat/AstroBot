@@ -17,9 +17,8 @@ async function execute(client, message, args, supabase) {
   const messageLatency = sent.createdTimestamp - message.createdTimestamp;
   const apiLatency = Math.round(client.ws.ping);
 
-  const embed = cmdResponseEmbed()
+  const embed = cmdResponseEmbed('Latency check complete!')
     .setTitle('🏓 Ping | Latency Check')
-    .setDescription(' ')
     .addFields(
       { name: 'Message Latency', value: `${messageLatency}ms`, inline: true },
       { name: 'API Latency', value: `${apiLatency}ms`, inline: true }
