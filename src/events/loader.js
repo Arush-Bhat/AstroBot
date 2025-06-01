@@ -78,7 +78,7 @@ export async function setupHandlers(client) {
       }
     } catch (err) {
       console.error(`❌ Error executing command ${commandName}:`, err);
-      message.reply('An error occurred while executing that command.');
+      message.reply('An error occurred while executing that command.'+err);
     }
   });
 }
