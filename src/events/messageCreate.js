@@ -81,7 +81,7 @@ export default async function messageCreate(message, client) {
     const result = await command.execute(client, message, args, supabase);
 
     // Delete original message if not in modch (and not the modch command itself)
-    if (!isModch) {
+    if (modchId && !isModch) {
       await message.delete().catch(() => {});
     }
 
@@ -100,7 +100,7 @@ export default async function messageCreate(message, client) {
           files: result.reply.files ?? [],
         });
       } else {
-        console.warn('⚠️ Modch channel is not accessible or not text-based.');
+        console.warn('⚠️ Modch channel is nots accessible or not text-based.');
       }
     }
 
