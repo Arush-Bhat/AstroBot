@@ -32,7 +32,7 @@ export default async function interactionCreate(interaction, client) {
   if (error || !data?.member_role_id || !data?.visitor_role_id) {
     console.error('❌ Supabase fetch error:', error);
     try {
-      await interaction.user.send('❌ Could not load role configuration. Please contact an admin.');
+      await interaction.user.send('❌ Role configuration is missing. Please contact an admin.');
     } catch (_) {}
     return;
   }
