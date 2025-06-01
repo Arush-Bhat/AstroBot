@@ -68,7 +68,13 @@ async function execute(client, message, args, supabase) {
   // Update guild_settings with the nick_message_id
   const { error: updateError } = await supabase
     .from('guild_settings')
-    .update({ nick_message_id: sent.id })
+    .update({ 
+      nick_message_id: sent.id, 
+      roles: {
+        role_to_add: targetRole.id,
+        role_to_remove: visRole.id,
+      }
+    })
     .eq('guild_id', message.guild.id);
 
   if (updateError) {
