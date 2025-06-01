@@ -45,7 +45,10 @@ export default async function messageCreate(message, client) {
     );
   }
 
-  if (commandName !== 'modch' && !guildSettings?.modch_channel_id) {
+  const modchId = guildSettings?.modch_channel_id;
+  const isModch = message.channel.id === modchId;
+
+  if (commandName !== 'modch' && !modchId) {
     await message.delete().catch(() => {});
     return await cmdErrorEmbed(
       message,
@@ -74,19 +77,32 @@ export default async function messageCreate(message, client) {
   try {
     const result = await command.execute(client, message, args, supabase);
 
-    // Newer commands return reply and log info
-    if (result?.reply) {
-      await message.reply(result.reply);
+    // If command was not sent in modch, delete it
+    if (!isModch && commandName !== 'modch') {
+      await message.delete().catch(() => {});
     }
 
+    // Handle command reply
+    if (result?.reply) {
+      const modchChannel = message.guild.channels.cache.get(modchId);
+
+      if (isModch || commandName === 'modch') {
+        await message.reply(result.reply);
+      } else if (modchChannel && modchChannel.isTextBased()) {
+        await modchChannel.send({
+          content: `**Command executed by ${message.author}:**`,
+          ...result.reply,
+        });
+      }
+    }
+
+    // Handle command logging
     if (result?.log) {
       await logCommand(client, result.log);
     } else {
-      // Backward compatibility logging
       const userMentionMatch = args[0]?.match(/^<@!?(\d+)>$/);
       const targetUserId = userMentionMatch?.[1] ?? null;
       const reason = targetUserId ? args.slice(1).join(' ') : args.join(' ');
-      const isModch = message.channel.id === guildSettings.modch_channel_id;
 
       await logCommand({
         client,
