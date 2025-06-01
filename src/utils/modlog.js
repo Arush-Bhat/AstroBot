@@ -11,7 +11,6 @@ export async function logCommand({
   message,
   commandName,
   reason = null,
-  channelName,
   targetUserId = null,
   isModch = false,
 }) {
@@ -22,7 +21,7 @@ export async function logCommand({
 
   const guildId = message.guild.id;
   const usedBy = message.author;
-  const usedInChannel = channelName;
+  const usedInChannel = message.channel;
 
   // Format IST time
   const usedAt = dayjs().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
