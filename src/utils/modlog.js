@@ -26,21 +26,30 @@ export async function logCommand({
   // Format IST time
   const usedAt = dayjs().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
 
+  // Defensive: ensure all fields are strings
+  const safeCommandName = String(commandName ?? 'N/A');
+  const safeUsedBy = `${usedBy.tag ?? 'Unknown#0000'} (${usedBy.id ?? 'N/A'})`;
+  const safeTargetUser = targetUserId ? `<@${targetUserId}>` : 'N/A';
+  const safeUsedAt = String(usedAt);
+  const safeChannel = `${usedInChannel.name ?? 'unknown'} (${usedInChannel.id ?? 'N/A'})`;
+  const safeIsModch = isModch ? 'Yes' : 'No';
+  const safeReason = reason && !reason.match(/^<#\d+>$/) ? String(reason) : null;
+
   // Build embed
   const embed = new EmbedBuilder()
     .setColor(0x0099ff)
     .setTitle('Command Executed')
     .addFields(
-      { name: 'Command', value: commandName, inline: true },
-      { name: 'Used By', value: `${usedBy.tag} (${usedBy.id})`, inline: true },
-      { name: 'Target User', value: targetUserId ? `<@${targetUserId}>` : 'N/A', inline: true },
-      { name: 'Used At (IST)', value: usedAt, inline: true },
-      { name: 'Channel', value: `${usedInChannel.name} (${usedInChannel.id})`, inline: true },
-      { name: 'Used In Modch?', value: isModch ? 'Yes' : 'No', inline: true },
+      { name: 'Command', value: safeCommandName, inline: true },
+      { name: 'Used By', value: safeUsedBy, inline: true },
+      { name: 'Target User', value: safeTargetUser, inline: true },
+      { name: 'Used At (IST)', value: safeUsedAt, inline: true },
+      { name: 'Channel', value: safeChannel, inline: true },
+      { name: 'Used In Modch?', value: safeIsModch, inline: true }
     );
 
-  if (reason && !reason.match(/^<#\d+>$/)) {
-    embed.addFields({ name: 'Reason', value: reason });
+  if (safeReason) {
+    embed.addFields({ name: 'Reason', value: safeReason });
   }
 
   // Send embed to modlog channel if set

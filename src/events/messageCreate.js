@@ -32,7 +32,7 @@ export default async function messageCreate(message, client) {
 
   if (error || !guildSettings) {
     console.error('Supabase error:', error);
-    return await cmdErrorEmbed(message, 'Could not fetch guild settings.');
+    return await cmdErrorEmbed('Could not fetch guild settings.', message);
   }
 
   const modchId = guildSettings?.modch_channel_id;
@@ -54,8 +54,8 @@ export default async function messageCreate(message, client) {
   if (commandName !== 'modch' && !modchId) {
     await message.delete().catch(() => {});
     return await cmdErrorEmbed(
-      message,
-      `Moderator commands channel not set. Use \`${prefix}modch #channel\` first.`
+      `Moderator commands channel not set. Use \`${prefix}modch #channel\` first.`,
+      message
     );
   }
 
@@ -64,15 +64,15 @@ export default async function messageCreate(message, client) {
   if (perm === 'Admin') {
     if (!hasRoleOrHigher(message.member, guildSettings.admin_role_id)) {
       return await cmdErrorEmbed(
-        message,
-        'You must have the administrator role or higher to use this command.'
+        'You must have the administrator role or higher to use this command.',
+        message
       );
     }
   } else if (perm === 'Mod') {
     if (!hasRoleOrHigher(message.member, guildSettings.mod_role_id)) {
       return await cmdErrorEmbed(
-        message,
-        'You must have the moderator role or higher to use this command.'
+        'You must have the moderator role or higher to use this command.',
+        message
       );
     }
   }
@@ -129,6 +129,6 @@ export default async function messageCreate(message, client) {
     }
   } catch (err) {
     console.error(`Command execution error (${commandName}):`, err);
-    await cmdErrorEmbed(message, 'There was an error while executing this command.');
+    await cmdErrorEmbed('There was an error while executing this command.', message);
   }
 }
