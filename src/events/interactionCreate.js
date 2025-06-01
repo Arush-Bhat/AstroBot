@@ -1,80 +1,53 @@
-import { Events, EmbedBuilder } from 'discord.js';
-import supabase from '../supabaseClient.js';
+// src/events/interactionCreate.js
 
-export default {
-  name: Events.InteractionCreate,
-  async execute(interaction) {
-    if (!interaction.isButton()) return;
+export default async function interactionCreate(interaction, client) {
+  if (!interaction.isButton()) return;
+  
+  if (interaction.customId === 'nickset_button') {
+    const member = interaction.guild.members.cache.get(interaction.user.id);
+    if (!member) return;
 
-    const { customId, member, guild } = interaction;
-
-    // Init Role button logic
-    if (customId.startsWith('initrole-')) {
-      const id = customId.split('-')[1];
-
-      const { data, error } = await supabase
-        .from('init_roles')
-        .select('*')
-        .eq('guild_id', guild.id)
-        .eq('message_id', id)
-        .single();
-
-      if (error || !data) {
-        return interaction.reply({ content: 'Role configuration not found.', ephemeral: true });
-      }
-
-      const added = [];
-      const removed = [];
-
-      for (const roleId of data.add_roles || []) {
-        if (!member.roles.cache.has(roleId)) {
-          await member.roles.add(roleId).catch(() => null);
-          added.push(`<@&${roleId}>`);
-        }
-      }
-
-      for (const roleId of data.remove_roles || []) {
-        if (member.roles.cache.has(roleId)) {
-          await member.roles.remove(roleId).catch(() => null);
-          removed.push(`<@&${roleId}>`);
-        }
-      }
-
-      await interaction.deferUpdate();
-
-      await interaction.message.edit({ components: [] }); // disable the button
-
-      await interaction.followUp({
-        content: `✅ Roles updated!\n${added.length ? `Added: ${added.join(', ')}` : ''}\n${removed.length ? `Removed: ${removed.join(', ')}` : ''}`,
+    try {
+      await interaction.reply({
+        content: '📩 Check your DMs to continue.',
         ephemeral: true,
       });
 
-      return;
-    }
+      const dm = await interaction.user.createDM();
+      await dm.send('📛 Please enter your **real name**. This will be set as your nickname.');
 
-    // Polls (multi/single)
-    if (customId.startsWith('poll-')) {
-      const [_, messageId, emoji, isMulti] = customId.split('-');
-      const msg = await interaction.channel.messages.fetch(messageId).catch(() => null);
-      if (!msg) return interaction.reply({ content: 'Poll message not found.', ephemeral: true });
+      const filter = m => m.author.id === interaction.user.id;
+      const collected = await dm.awaitMessages({ filter, max: 1, time: 60000 });
+      const name = collected.first()?.content;
 
-      const userId = interaction.user.id;
+      if (!name) return await dm.send('❌ No name received. Please try again later.');
 
-      // Remove all other reactions if not multi
-      if (isMulti === 'false') {
-        for (const [em, reaction] of msg.reactions.cache) {
-          if (em !== emoji) {
-            await reaction.users.remove(userId).catch(() => {});
-          }
-        }
+      await dm.send(`✅ Is **"${name}"** correct? Reply with \`y\` to confirm.`);
+      const confirm = await dm.awaitMessages({ filter, max: 1, time: 30000 });
+      const confirmation = confirm.first()?.content.toLowerCase();
+
+      if (confirmation !== 'y') {
+        return await dm.send('❌ Confirmation failed. No changes were made.');
       }
 
-      // React on behalf of user
-      await msg.react(emoji).catch(() => {});
-      await interaction.reply({ content: `Voted with ${emoji}`, ephemeral: true });
-      return;
-    }
+      // TODO: Save mapping of userId → roleToAdd, roleToRemove from DB or cache
+      // For now just assume they're set (this needs storing in Supabase or a Map)
 
-    // Reaction Role logic handled via raw reactions in messageReactionAdd/Remove
+      await member.setNickname(name, 'Nickname set via $nickset');
+      // await member.roles.add(roleToAdd);
+      // await member.roles.remove(roleToRemove);
+
+      await dm.send('✅ Nickname set successfully and roles updated!');
+    } catch (err) {
+      console.error('Nickname interaction error:', err);
+      try {
+        await interaction.user.send(
+          '❌ An error occurred while setting your nickname. Please ensure:\n' +
+          '- Your DMs are open\n' +
+          '- I have permission to change nicknames and manage roles\n\n' +
+          'Then try again.'
+        );
+      } catch (_) {}
+    }
   }
-};
+}
