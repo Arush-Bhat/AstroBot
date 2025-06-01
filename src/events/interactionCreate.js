@@ -1,6 +1,7 @@
 // src/events/interactionCreate.js
+import supabase from '../supabaseClient.js'; // adjust path if needed
 
-export default async function interactionCreate(interaction, client, supabase) {
+export default async function interactionCreate(interaction, client) {
   if (!interaction.isButton()) return;
 
   if (interaction.customId === 'nickset_button') {

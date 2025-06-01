@@ -20,7 +20,7 @@ export async function setupHandlers(client) {
         continue;
       }
 
-      client.on(eventName, (...args) => event.default(...args, client, client.supabase));
+      client.on(eventName, (...args) => event.default(...args, client));
       console.log(`✅ Loaded event: ${eventName}`);
     } catch (err) {
       console.error(`❌ Failed to load event "${file}":`, err);
