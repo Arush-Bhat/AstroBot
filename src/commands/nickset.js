@@ -43,22 +43,32 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Fetch existing nick_message_id to delete old message
-  const { data: settingsData, error: fetchError } = await supabase
+  // Ensure guild_settings row exists
+  const { data: existing, error: fetchError } = await supabase
     .from('guild_settings')
     .select('nick_message_id')
     .eq('guild_id', message.guild.id)
     .single();
 
-  if (fetchError) {
-    console.error('⚠️ Failed to fetch old nick_message_id:', fetchError.message);
-  } else if (settingsData?.nick_message_id) {
+  if (fetchError && fetchError.code !== 'PGRST116') {
+    console.error('❌ Supabase fetch error:', fetchError.message);
+    return {
+      reply: {
+        embeds: [cmdErrorEmbed('Database Error', '❌ Could not check existing nickset configuration.')],
+      },
+    };
+  }
+
+  // Try deleting the previous nickset message if it exists
+  if (existing?.nick_message_id) {
     try {
-      const oldMsg = await channel.messages.fetch(settingsData.nick_message_id);
-      if (oldMsg) await oldMsg.delete();
-      console.log('🗑️ Deleted old nickset message:', settingsData.nick_message_id);
+      const oldMsg = await channel.messages.fetch(existing.nick_message_id);
+      if (oldMsg) {
+        await oldMsg.delete();
+        console.log('🗑️ Deleted old nickset message:', existing.nick_message_id);
+      }
     } catch (err) {
-      console.warn('⚠️ Failed to delete old nickset message (might be gone):', err.message);
+      console.warn('⚠️ Could not delete old nickset message (might not exist):', err.message);
     }
   }
 
@@ -86,18 +96,21 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Update Supabase with the new message ID and roles
-  const { error: updateError } = await supabase
+  // Insert or update guild_settings with new message and role IDs
+  const { error: upsertError } = await supabase
     .from('guild_settings')
-    .update({
-      nick_message_id: sent.id,
-      member_role_id: memberRole.id,
-      visitor_role_id: visitorRole.id,
-    })
-    .eq('guild_id', message.guild.id);
+    .upsert(
+      {
+        guild_id: message.guild.id,
+        nick_message_id: sent.id,
+        member_role_id: memberRole.id,
+        visitor_role_id: visitorRole.id,
+      },
+      { onConflict: 'guild_id' }
+    );
 
-  if (updateError) {
-    console.error('❌ Supabase update error (nick_message_id & roles):', updateError);
+  if (upsertError) {
+    console.error('❌ Supabase upsert error (nick_message_id & roles):', upsertError);
     return {
       reply: {
         embeds: [cmdErrorEmbed('Database Error', '❌ Failed to save message ID and roles.')],
