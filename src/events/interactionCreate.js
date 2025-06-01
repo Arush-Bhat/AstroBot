@@ -7,36 +7,66 @@ export default async function interactionCreate(interaction, client, supabase) {
     const member = interaction.guild.members.cache.get(interaction.user.id);
     if (!member) return;
 
+    console.log(`⚡ Nickname setup started for ${interaction.user.tag} in ${interaction.guild.name}`);
+
     try {
       await interaction.reply({
         content: '📩 Check your DMs to continue.',
-        ephemeral: true,
+        flags: 64, // ephemeral
       });
+    } catch (err) {
+      console.error('❌ Failed to reply to interaction:', err);
+      return;
+    }
 
-      // Fetch role info from guild_settings
-      const { data, error } = await supabase
-        .from('guild_settings')
-        .select('roles')
-        .eq('guild_id', interaction.guild.id)
-        .single();
+    // Fetch role info from Supabase
+    const { data, error } = await supabase
+      .from('guild_settings')
+      .select('roles')
+      .eq('guild_id', interaction.guild.id)
+      .single();
 
-      if (error || !data?.roles?.role_to_add || !data?.roles?.role_to_remove) {
-        console.error('❌ Failed to fetch roles from Supabase:', error);
+    if (error || !data?.roles?.role_to_add || !data?.roles?.role_to_remove) {
+      console.error('❌ Supabase fetch error:', error);
+      try {
         await interaction.user.send('❌ Could not load role configuration. Please contact an admin.');
-        return;
-      }
+      } catch (_) {}
+      return;
+    }
 
-      const roleToAddId = data.roles.role_to_add;
-      const roleToRemoveId = data.roles.role_to_remove;
-      const roleToAdd = interaction.guild.roles.cache.get(roleToAddId);
-      const roleToRemove = interaction.guild.roles.cache.get(roleToRemoveId);
+    const roleToAddId = data.roles.role_to_add;
+    const roleToRemoveId = data.roles.role_to_remove;
 
-      if (!roleToAdd || !roleToRemove) {
-        await interaction.user.send('❌ One or more configured roles are missing in this server.');
-        return;
-      }
+    const roleToAdd = interaction.guild.roles.cache.get(roleToAddId);
+    const roleToRemove = interaction.guild.roles.cache.get(roleToRemoveId);
 
-      // Ask for name in DM
+    if (!roleToAdd || !roleToRemove) {
+      try {
+        await interaction.user.send('❌ One or more roles are missing in the server. Please contact an admin.');
+      } catch (_) {}
+      return;
+    }
+
+    // Role hierarchy check
+    const botMember = interaction.guild.members.me;
+    const botHighest = botMember.roles.highest.position;
+    const userHighest = member.roles.highest.position;
+
+    if (
+      roleToAdd.position >= botHighest ||
+      roleToRemove.position >= botHighest ||
+      userHighest >= botHighest
+    ) {
+      try {
+        await interaction.user.send(
+          '❌ I can’t update your nickname or roles because of role hierarchy. Please contact an admin.'
+        );
+      } catch (_) {}
+      console.warn('⚠️ Role hierarchy prevents action on', interaction.user.tag);
+      return;
+    }
+
+    try {
       const dm = await interaction.user.createDM();
       await dm.send('📛 Please enter your **real name**. This will be set as your nickname.');
 
@@ -58,22 +88,42 @@ export default async function interactionCreate(interaction, client, supabase) {
         return;
       }
 
-      // Apply nickname and roles
-      await member.setNickname(name, 'Nickname set via $nickset');
-      await member.roles.add(roleToAdd);
-      await member.roles.remove(roleToRemove);
+      console.log(`🔧 Setting nickname "${name}" for ${interaction.user.tag}`);
+
+      try {
+        await member.setNickname(name, 'Nickname set via $nickset');
+      } catch (err) {
+        console.error('❌ Failed to set nickname:', err);
+        await dm.send('❌ Failed to set your nickname. I might lack permission.');
+        return;
+      }
+
+      try {
+        await member.roles.add(roleToAdd);
+      } catch (err) {
+        console.error('❌ Failed to add role:', err);
+        await dm.send('❌ Failed to add your role. Please contact an admin.');
+        return;
+      }
+
+      try {
+        await member.roles.remove(roleToRemove);
+      } catch (err) {
+        console.error('❌ Failed to remove role:', err);
+        await dm.send('⚠️ Failed to remove your previous role. Please contact an admin.');
+        // continue anyway
+      }
 
       await dm.send('✅ Nickname set successfully and roles updated!');
     } catch (err) {
       console.error('Nickname interaction error:', err);
       try {
         await interaction.user.send(
-          '❌ An error occurred while setting your nickname. Please ensure:\n' +
-          '- Your DMs are open\n' +
-          '- I have permission to change nicknames and manage roles\n\n' +
-          'Then try again.'
+          '❌ An unexpected error occurred while setting your nickname. Please try again later.'
         );
-      } catch (_) {}
+      } catch (dmErr) {
+        console.error('❌ Failed to send error DM to user:', dmErr);
+      }
     }
   }
 }
