@@ -88,11 +88,16 @@ export default async function messageCreate(message, client) {
 
       if (isModch || commandName === 'modch') {
         await message.reply(result.reply);
-      } else if (modchChannel && modchChannel.isTextBased()) {
+      } else if (modchChannel?.isTextBased()) {
+        console.log(`✅ Sending command output to modch channel: ${modchChannel?.name}`);
         await modchChannel.send({
           content: `**Command executed by ${message.author}:**`,
-          ...result.reply,
+          embeds: result.reply.embeds ?? [],
+          components: result.reply.components ?? [],
+          files: result.reply.files ?? [],
         });
+      } else {
+        console.warn('⚠️ Modch channel is not accessible or not text-based.');
       }
     }
 
