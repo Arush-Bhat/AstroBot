@@ -7,6 +7,14 @@ export default async function interactionCreate(interaction, client) {
   if (interaction.customId === 'nickset_button') {
     let member;
     try {
+      // Immediately acknowledge button interaction silently
+      await interaction.deferUpdate();
+    } catch (err) {
+      console.error('❌ Failed to deferUpdate interaction:', err);
+      return;
+    }
+
+    try {
       // Fetch fresh member data to avoid stale cache issues
       member = await interaction.guild.members.fetch(interaction.user.id);
     } catch (err) {
@@ -20,13 +28,6 @@ export default async function interactionCreate(interaction, client) {
     }
 
     console.log(`⚡ Nickname setup started for ${interaction.user.tag} in ${interaction.guild.name}`);
-
-    try {
-      await interaction.deferReply({ ephemeral: true });
-    } catch (err) {
-      console.error('❌ Failed to defer interaction:', err);
-      return;
-    }
 
     // Fetch role info from Supabase
     const { data, error } = await supabase
@@ -92,10 +93,6 @@ export default async function interactionCreate(interaction, client) {
     try {
       const dm = await interaction.user.createDM();
       await dm.send('📛 Please enter your **real name**. This will be set as your nickname.');
-
-      await interaction.editReply({
-        content: '📩 Check your DMs to continue.',
-      });
 
       const filter = m => m.author.id === interaction.user.id;
       const collected = await dm.awaitMessages({ filter, max: 1, time: 60000 });
