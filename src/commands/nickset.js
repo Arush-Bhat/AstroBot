@@ -17,6 +17,7 @@ const data = {
 };
 
 async function execute(client, message, args, supabase) {
+  console.log('✅ Command nickset.js executed with args:', args);
   const channel = message.mentions.channels.first();
   const rolesMentioned = Array.from(message.mentions.roles.values());
   const targetRole = rolesMentioned[0];

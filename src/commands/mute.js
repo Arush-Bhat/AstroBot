@@ -9,7 +9,7 @@ const data = {
 };
 
 async function execute(client, message, args, supabase) {
-  console.log('✅ Command modch.js executed with args:', args);
+  console.log('✅ Command mute.js executed with args:', args);
   const guild = message.guild;
   const member = message.member;
   const guildId = guild.id;
