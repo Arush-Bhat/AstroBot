@@ -35,11 +35,16 @@ export default async function interactionCreate(interaction, client) {
       return;
     }
 
+    console.log('📦 Supabase roles:', data.roles);
+
     const roleToAddId = data.roles.role_to_add;
     const roleToRemoveId = data.roles.role_to_remove;
 
     const roleToAdd = interaction.guild.roles.cache.get(roleToAddId);
     const roleToRemove = interaction.guild.roles.cache.get(roleToRemoveId);
+
+    console.log('🎯 Role to add:', roleToAdd?.name, roleToAddId);
+    console.log('🗑️ Role to remove:', roleToRemove?.name, roleToRemoveId);
 
     if (!roleToAdd || !roleToRemove) {
       try {
@@ -52,6 +57,11 @@ export default async function interactionCreate(interaction, client) {
     const botMember = interaction.guild.members.me;
     const botHighest = botMember.roles.highest.position;
     const userHighest = member.roles.highest.position;
+
+    console.log('🔍 Bot highest role position:', botHighest);
+    console.log('🔍 roleToAdd position:', roleToAdd.position);
+    console.log('🔍 roleToRemove position:', roleToRemove.position);
+    console.log('🔍 User highest role position:', userHighest);
 
     if (
       roleToAdd.position >= botHighest ||
@@ -93,6 +103,7 @@ export default async function interactionCreate(interaction, client) {
 
       try {
         await member.setNickname(name, 'Nickname set via $nickset');
+        console.log(`✅ Nickname set for ${interaction.user.tag}`);
       } catch (err) {
         console.error('❌ Failed to set nickname:', err);
         await dm.send('❌ Failed to set your nickname. I might lack permission.');
@@ -100,6 +111,7 @@ export default async function interactionCreate(interaction, client) {
       }
 
       try {
+        console.log(`➕ Adding role "${roleToAdd.name}" to ${member.user.tag}`);
         await member.roles.add(roleToAdd);
       } catch (err) {
         console.error('❌ Failed to add role:', err);
@@ -108,6 +120,7 @@ export default async function interactionCreate(interaction, client) {
       }
 
       try {
+        console.log(`➖ Removing role "${roleToRemove.name}" from ${member.user.tag}`);
         await member.roles.remove(roleToRemove);
       } catch (err) {
         console.error('❌ Failed to remove role:', err);
