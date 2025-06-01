@@ -35,6 +35,10 @@ export default async function messageCreate(message, client) {
     return await cmdErrorEmbed(message, 'Could not fetch guild settings.');
   }
 
+  const modchId = guildSettings?.modch_channel_id;
+  const isModch = message.channel.id === modchId;
+
+  // Block commands if mod/admin roles are missing
   if (
     (!guildSettings?.mod_role_id || !guildSettings?.admin_role_id) &&
     !['setmod', 'setadmin'].includes(commandName)
@@ -45,9 +49,7 @@ export default async function messageCreate(message, client) {
     );
   }
 
-  const modchId = guildSettings?.modch_channel_id;
-  const isModch = message.channel.id === modchId;
-
+  // Block if modch isn't set
   if (commandName !== 'modch' && !modchId) {
     await message.delete().catch(() => {});
     return await cmdErrorEmbed(
@@ -77,19 +79,19 @@ export default async function messageCreate(message, client) {
   try {
     const result = await command.execute(client, message, args, supabase);
 
-    // If command was not sent in modch, delete it
+    // Delete original message if not in modch (and not the modch command itself)
     if (!isModch && commandName !== 'modch') {
       await message.delete().catch(() => {});
     }
 
-    // Handle command reply
+    // Handle reply
     if (result?.reply) {
       const modchChannel = message.guild.channels.cache.get(modchId);
 
       if (isModch || commandName === 'modch') {
         await message.reply(result.reply);
       } else if (modchChannel?.isTextBased()) {
-        console.log(`✅ Sending command output to modch channel: ${modchChannel?.name}`);
+        console.log(`✅ Sending command output to modch channel: ${modchChannel.name}`);
         await modchChannel.send({
           content: `**Command executed by ${message.author}:**`,
           embeds: result.reply.embeds ?? [],
