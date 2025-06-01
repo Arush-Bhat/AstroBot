@@ -1,5 +1,5 @@
 import { Events, EmbedBuilder } from 'discord.js';
-import supabase from './src/supabaseClient'
+import supabase from '../supabaseClient.js';
 
 export default {
   name: Events.InteractionCreate,
