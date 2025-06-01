@@ -64,22 +64,17 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // UPSERT config in Supabase to overwrite if guild config exists
-  const { error: upsertError } = await supabase
-    .from('nickset_configs')
-    .upsert({
-      guild_id: message.guild.id,
-      message_id: sent.id,
-      channel_id: sent.channel.id,
-      role_to_add: targetRole.id,
-      role_to_remove: visRole.id,
-    }, { onConflict: 'guild_id' });
+  // Update guild_settings with the nick_message_id
+  const { error: updateError } = await supabase
+    .from('guild_settings')
+    .update({ nick_message_id: sent.id })
+    .eq('guild_id', message.guild.id);
 
-  if (upsertError) {
-    console.error('❌ Supabase upsert error (nickset_configs):', upsertError);
+  if (updateError) {
+    console.error('❌ Supabase update error (nick_message_id):', updateError);
     return {
       reply: {
-        embeds: [cmdErrorEmbed('Database Error', '❌ Could not store configuration for the nickset button.')],
+        embeds: [cmdErrorEmbed('Database Error', '❌ Failed to save the nickset button message ID.')],
       },
     };
   }
