@@ -3,15 +3,24 @@ import supabase from '../supabaseClient.js';
 export default async function messageReactionAdd(reaction, user, client) {
   if (user.bot) return;
 
+  // Fetch full reaction object if partial
+  if (reaction.partial) {
+    try {
+      await reaction.fetch();
+    } catch (err) {
+      console.error('Failed to fetch reaction:', err);
+      return;
+    }
+  }
+
   const { message, emoji } = reaction;
 
   try {
-    // REACTION ROLES HANDLING
+    // Fetch reaction_roles config for this message
     const { data: reactionRole, error: reactionRoleError } = await supabase
       .from('reaction_roles')
       .select('*')
       .eq('message_id', message.id)
-      .eq('emoji', emoji.name)
       .single();
 
     if (reactionRoleError && reactionRoleError.code !== 'PGRST116') {
@@ -19,8 +28,13 @@ export default async function messageReactionAdd(reaction, user, client) {
     }
 
     if (reactionRole) {
-      const role = message.guild.roles.cache.get(reactionRole.role_id);
-      const member = message.guild.members.cache.get(user.id);
+      const emojiKey = emoji.id ? `${emoji.name}:${emoji.id}` : emoji.name;
+      const roleId = reactionRole.roles?.[emojiKey];
+
+      if (!roleId) return;
+
+      const member = await message.guild.members.fetch(user.id).catch(() => null);
+      const role = message.guild.roles.cache.get(roleId);
 
       if (!role || !member) return;
 
@@ -51,7 +65,9 @@ export default async function messageReactionAdd(reaction, user, client) {
     }
 
     if (poll && !poll.is_multi) {
-      const userReactions = message.reactions.cache.filter(r => r.users.cache.has(user.id));
+      const userReactions = message.reactions.cache.filter(r =>
+        r.users.cache.has(user.id)
+      );
 
       for (const r of userReactions.values()) {
         if (r.emoji.name !== emoji.name) {
@@ -62,4 +78,4 @@ export default async function messageReactionAdd(reaction, user, client) {
   } catch (err) {
     console.error('Error handling messageReactionAdd event:', err);
   }
-};
+}

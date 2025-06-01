@@ -21,7 +21,6 @@ export default async function messageReactionRemove(reaction, user, client) {
       .from('reaction_roles')
       .select('*')
       .eq('message_id', message.id)
-      .eq('emoji', emoji.name)
       .single();
 
     if (error) {
@@ -35,10 +34,12 @@ export default async function messageReactionRemove(reaction, user, client) {
     if (!reactionRole.togglable) return;
 
     const roleId = reactionRole.role_id;
-    if (!roleId) return;
+    if (!roleId || !reactionRole.togglable) return;
 
     const member = await message.guild.members.fetch(user.id).catch(() => null);
-    if (!member) return;
+    if (!member) {
+      await member.roles.remove(roleId).catch(console.error);
+    };
 
     await member.roles.remove(roleId).catch(err => {
       console.error('Failed to remove role:', err);
