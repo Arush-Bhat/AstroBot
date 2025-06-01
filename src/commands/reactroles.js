@@ -161,6 +161,7 @@ async function execute(client, message, args, supabase) {
 
   for (const emoji of Object.keys(mappings)) {
     try {
+      console.log(`Reacting with emoji: [${emoji}]`);
       await post.react(emoji);
     } catch (err) {
       console.warn(`Failed to react with emoji ${emoji}`, err);
