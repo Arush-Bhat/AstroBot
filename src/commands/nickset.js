@@ -13,36 +13,56 @@ const permissionLevel = 'Admin';
 const data = {
   name: 'nickset',
   description: 'Send a button message to let users set their nickname via DM.',
-  usage: '$nickset #channel msg(Your message) btn(Button Text) @role @visrole',
+  usage: '$nickset #channel msg(Your message) btn(Button Text) @memberRole @visitorRole',
 };
 
 async function execute(client, message, args, supabase) {
   console.log('✅ Command nickset.js executed with args:', args);
+  
   const channel = message.mentions.channels.first();
   const rolesMentioned = Array.from(message.mentions.roles.values());
-  const targetRole = rolesMentioned[0];
-  const visRole = rolesMentioned[1];
+  const memberRole = rolesMentioned[0];
+  const visitorRole = rolesMentioned[1];
 
   const msgMatch = message.content.match(/msg\((.*?)\)/);
   const btnMatch = message.content.match(/btn\((.*?)\)/);
   const msgText = msgMatch?.[1];
   const btnText = btnMatch?.[1];
 
-  if (!channel || !msgText || !btnText || !targetRole || !visRole) {
+  if (!channel || !msgText || !btnText || !memberRole || !visitorRole) {
     return {
       reply: {
         embeds: [
           cmdErrorEmbed(
             'Invalid Syntax',
             '❌ Missing arguments.\n\n' +
-            '**Usage:** `$nickset #channel msg(Welcome) btn(Click Me) @role @visrole`'
+            '**Usage:** `$nickset #channel msg(Welcome) btn(Click Me) @memberRole @visitorRole`'
           )
         ],
       },
     };
   }
 
-  // Send the button message
+  // Fetch existing nick_message_id to delete old message
+  const { data: settingsData, error: fetchError } = await supabase
+    .from('guild_settings')
+    .select('nick_message_id')
+    .eq('guild_id', message.guild.id)
+    .single();
+
+  if (fetchError) {
+    console.error('⚠️ Failed to fetch old nick_message_id:', fetchError.message);
+  } else if (settingsData?.nick_message_id) {
+    try {
+      const oldMsg = await channel.messages.fetch(settingsData.nick_message_id);
+      if (oldMsg) await oldMsg.delete();
+      console.log('🗑️ Deleted old nickset message:', settingsData.nick_message_id);
+    } catch (err) {
+      console.warn('⚠️ Failed to delete old nickset message (might be gone):', err.message);
+    }
+  }
+
+  // Create new button
   const button = new ButtonBuilder()
     .setCustomId('nickset_button')
     .setLabel(btnText)
@@ -50,6 +70,7 @@ async function execute(client, message, args, supabase) {
 
   const row = new ActionRowBuilder().addComponents(button);
 
+  // Send new message
   let sent;
   try {
     sent = await channel.send({
@@ -65,23 +86,21 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Update guild_settings with the nick_message_id
+  // Update Supabase with the new message ID and roles
   const { error: updateError } = await supabase
     .from('guild_settings')
-    .update({ 
-      nick_message_id: sent.id, 
-      roles: {
-        role_to_add: targetRole.id,
-        role_to_remove: visRole.id,
-      }
+    .update({
+      nick_message_id: sent.id,
+      member_role_id: memberRole.id,
+      visitor_role_id: visitorRole.id,
     })
     .eq('guild_id', message.guild.id);
 
   if (updateError) {
-    console.error('❌ Supabase update error (nick_message_id):', updateError);
+    console.error('❌ Supabase update error (nick_message_id & roles):', updateError);
     return {
       reply: {
-        embeds: [cmdErrorEmbed('Database Error', '❌ Failed to save the nickset button message ID.')],
+        embeds: [cmdErrorEmbed('Database Error', '❌ Failed to save message ID and roles.')],
       },
     };
   }
@@ -90,8 +109,8 @@ async function execute(client, message, args, supabase) {
     reply: {
       embeds: [
         cmdResponseEmbed(
-          'Nickname Setup Prompt Sent',
-          `✅ A button was sent to ${channel}.\nUsers can now click it to start setup.`,
+          'Nickname Setup Sent',
+          `✅ A button was sent to ${channel}.\nUsers can now click it to set their name and get roles.`,
           'Green'
         )
       ],
