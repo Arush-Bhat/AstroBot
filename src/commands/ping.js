@@ -9,6 +9,7 @@ const data = {
 };
 
 async function execute(client, message, args, supabase) {
+  console.log('✅ Command modch.js executed with args:', args);
   // Send initial embed while calculating
   const sent = await message.channel.send({
     embeds: [cmdResponseEmbed('🏓 Calculating latency...', 'Latency Check')],

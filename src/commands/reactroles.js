@@ -11,6 +11,7 @@ const data = {
 };
 
 async function execute(client, message, args, supabase) {
+  console.log('✅ Command modch.js executed with args:', args);
   const { data: config } = await supabase
     .from('config')
     .select('mod_role_id, admin_role_id')

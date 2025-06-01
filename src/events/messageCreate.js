@@ -32,7 +32,7 @@ export default async function messageCreate(message, client) {
   const command = client.commands.get(commandName);
   if (!command) return;
 
-  if (error) {
+  if (error || !guildSettings) {
     console.error('Supabase error:', error);
     return await cmdErrorEmbed(message, 'Could not fetch guild settings.');
   }

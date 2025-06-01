@@ -12,6 +12,7 @@ const data = {
 };
 
 async function execute(client, message, args, supabase) {
+  console.log('✅ Command modch.js executed with args:', args);
   const guildId = message.guild.id;
   const authorId = message.author.id;
 

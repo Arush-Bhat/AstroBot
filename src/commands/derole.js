@@ -10,6 +10,7 @@ const data = {
 };
 
 async function execute(client, message, args, supabase) {
+  console.log('✅ Command modch.js executed with args:', args);
   // Permission check for Manage Roles
   if (!message.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
     return {

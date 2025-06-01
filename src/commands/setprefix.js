@@ -9,6 +9,7 @@ const data = {
 };
 
 async function execute(client, message, args, supabase) {
+  console.log('✅ Command modch.js executed with args:', args);
   const newPrefix = args[0];
 
   if (!newPrefix) {
