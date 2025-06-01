@@ -12,26 +12,26 @@ const data = {
 
 async function execute(client, message, args, supabase) {
   console.log('✅ Command reactroles.js executed with args:', args);
-  const { data: config } = await supabase
-    .from('config')
+  const { data: guild_settings } = await supabase
+    .from('guild_settings')
     .select('mod_role_id, admin_role_id')
     .eq('guild_id', message.guild.id)
     .single();
 
-  if (!config) {
+  if (!guild_settings) {
     return {
       reply: {
         embeds: [
           new EmbedBuilder()
             .setColor('Red')
-            .setTitle('❌ Server Not Configured')
-            .setDescription('Use `$setup` before running this command.'),
+            .setTitle('❌ Error finding database')
+            .setDescription('Please contact a developer regarding this issue.'),
         ],
       },
     };
   }
 
-  const isMod = isModerator(message.member, config.mod_role_id, config.admin_role_id);
+  const isMod = isModerator(message.member, guild_settings.mod_role_id, guild_settings.admin_role_id);
   if (!isMod) {
     return {
       reply: {
