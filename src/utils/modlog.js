@@ -39,7 +39,7 @@ export async function logCommand({
       { name: 'Used In Modch?', value: isModch ? 'Yes' : 'No', inline: true },
     );
 
-  if (reason) {
+  if (reason && !reason.match(/^<#\d+>$/)) {
     embed.addFields({ name: 'Reason', value: reason });
   }
 

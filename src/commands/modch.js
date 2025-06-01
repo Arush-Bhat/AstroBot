@@ -196,7 +196,7 @@ async function execute(client, message, args, supabase) {
       embeds: [
         cmdResponseEmbed(
           'Mod Commands Channel Set',
-          `✅ Moderator commands channel set to ${channel.toString()}`
+          `✅ Moderator commands channel successfully changed to ${channel.toString()}`
         ),
       ],
     },
