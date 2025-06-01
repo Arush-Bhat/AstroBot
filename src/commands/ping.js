@@ -9,8 +9,6 @@ const data = {
 };
 
 async function execute(client, message, args, supabase) {
-  console.log('✅ Command modch.js executed with args:', args);
-  // Send initial embed while calculating
   const sent = await message.channel.send({
     embeds: [cmdResponseEmbed('🏓 Calculating latency...', 'Latency Check')],
   });
@@ -26,6 +24,18 @@ async function execute(client, message, args, supabase) {
     );
 
   await sent.edit({ content: null, embeds: [embed] });
+
+  return {
+    log: {
+      action: 'ping_check',
+      executorUserId: message.author.id,
+      executorTag: message.author.tag,
+      guildId: message.guild.id,
+      timestamp: new Date().toISOString(),
+      messageLatency,
+      apiLatency,
+    },
+  };
 }
 
 export default {

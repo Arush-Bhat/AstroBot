@@ -16,7 +16,6 @@ function hasRoleOrHigher(member, roleId) {
 export default async function messageCreate(message, client) {
   if (message.author.bot || !message.guild) return;
 
-  // Fetch guild settings from Supabase
   const { data: guildSettings, error } = await supabase
     .from('guild_settings')
     .select('mod_role_id, admin_role_id, modch_channel_id, prefix')
@@ -24,7 +23,6 @@ export default async function messageCreate(message, client) {
     .single();
 
   const prefix = guildSettings?.prefix || DEFAULT_PREFIX;
-
   if (!message.content.startsWith(prefix)) return;
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
@@ -47,10 +45,7 @@ export default async function messageCreate(message, client) {
     );
   }
 
-  if (
-    commandName !== 'modch' &&
-    !guildSettings?.modch_channel_id
-  ) {
+  if (commandName !== 'modch' && !guildSettings?.modch_channel_id) {
     await message.delete().catch(() => {});
     return await cmdErrorEmbed(
       message,
@@ -62,43 +57,49 @@ export default async function messageCreate(message, client) {
   const perm = command.permissionLevel;
   if (perm === 'Admin') {
     if (!hasRoleOrHigher(message.member, guildSettings.admin_role_id)) {
-      return await cmdErrorEmbed(message, 'You must have the administrator role or higher to use this command.');
+      return await cmdErrorEmbed(
+        message,
+        'You must have the administrator role or higher to use this command.'
+      );
     }
   } else if (perm === 'Mod') {
     if (!hasRoleOrHigher(message.member, guildSettings.mod_role_id)) {
-      return await cmdErrorEmbed(message, 'You must have the moderator role or higher to use this command.');
+      return await cmdErrorEmbed(
+        message,
+        'You must have the moderator role or higher to use this command.'
+      );
     }
   }
 
   try {
-    await command.execute(client, message, args, supabase);
+    const result = await command.execute(client, message, args, supabase);
 
-    // Logging
-    let reason = null;
-    let targetUserId = null;
-
-    const userMentionMatch = args[0]?.match(/^<@!?(\d+)>$/);
-    if (userMentionMatch) {
-      targetUserId = userMentionMatch[1];
-      if (args.length > 1) reason = args.slice(1).join(' ');
-    } else {
-      reason = args.join(' ');
+    // Newer commands return reply and log info
+    if (result?.reply) {
+      await message.reply(result.reply);
     }
 
-    const isModch = message.channel.id === guildSettings.modch_channel_id;
+    if (result?.log) {
+      await logCommand(client, result.log);
+    } else {
+      // Backward compatibility logging
+      const userMentionMatch = args[0]?.match(/^<@!?(\d+)>$/);
+      const targetUserId = userMentionMatch?.[1] ?? null;
+      const reason = targetUserId ? args.slice(1).join(' ') : args.join(' ');
+      const isModch = message.channel.id === guildSettings.modch_channel_id;
 
-    await logCommand({
-      client,
-      supabase,
-      message,
-      commandName,
-      reason,
-      targetUserId,
-      isModch,
-    });
-
+      await logCommand({
+        client,
+        supabase,
+        message,
+        commandName,
+        reason,
+        targetUserId,
+        isModch,
+      });
+    }
   } catch (err) {
-    console.error('Command execution error:', err);
+    console.error(`Command execution error (${commandName}):`, err);
     await cmdErrorEmbed(message, 'There was an error while executing this command.');
   }
 }
