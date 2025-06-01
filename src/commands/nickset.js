@@ -43,7 +43,7 @@ async function execute(client, message, args, supabase) {
 
   // Send the button message
   const button = new ButtonBuilder()
-    .setCustomId('nickset_button') // keep this static if you use a shared handler
+    .setCustomId('nickset_button')
     .setLabel(btnText)
     .setStyle(ButtonStyle.Primary);
 
@@ -64,22 +64,22 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Save message-specific role config in Supabase
-  const { error: insertError } = await supabase
+  // UPSERT config in Supabase to overwrite if guild config exists
+  const { error: upsertError } = await supabase
     .from('nickset_configs')
-    .insert([{
+    .upsert({
       guild_id: message.guild.id,
       message_id: sent.id,
       channel_id: sent.channel.id,
       role_to_add: targetRole.id,
       role_to_remove: visRole.id,
-    }]);
+    }, { onConflict: 'guild_id' });
 
-  if (insertError) {
-    console.error('❌ Supabase insert error (nickset_configs):', insertError);
+  if (upsertError) {
+    console.error('❌ Supabase upsert error (nickset_configs):', upsertError);
     return {
       reply: {
-        embeds: [cmdErrorEmbed('Database Error', '❌ Could not store configuration for button.')],
+        embeds: [cmdErrorEmbed('Database Error', '❌ Could not store configuration for the nickset button.')],
       },
     };
   }
