@@ -14,6 +14,11 @@ export async function logCommand({
   targetUserId = null,
   isModch = false,
 }) {
+  if (!message || !message.guild) {
+    console.warn('logCommand: Missing message or guild in parameters');
+    return;
+  }
+
   const guildId = message.guild.id;
   const usedBy = message.author;
   const usedInChannel = message.channel;
@@ -40,25 +45,37 @@ export async function logCommand({
 
   // Send embed to modlog channel if set
   try {
-    const { data: guildSettings } = await supabase
+    const { data: guildSettings, error } = await supabase
       .from('guild_settings')
       .select('modlog_channel_id')
       .eq('guild_id', guildId)
       .single();
 
+    if (error) {
+      console.error('Supabase error fetching guild_settings:', error);
+      return;
+    }
+
     if (guildSettings?.modlog_channel_id) {
       const modlogChannel = client.channels.cache.get(guildSettings.modlog_channel_id);
-      if (modlogChannel) {
+      if (!modlogChannel || !modlogChannel.isTextBased()) {
+        console.warn('logCommand: modlog channel invalid or not text based');
+        return;
+      }
+
+      try {
         await modlogChannel.send({ embeds: [embed] });
+      } catch (sendErr) {
+        console.error('Error sending modlog embed:', sendErr);
       }
     }
   } catch (err) {
-    console.error('Error sending modlog embed:', err);
+    console.error('Error fetching modlog channel or sending embed:', err);
   }
 
-  // Insert backup log into Supabase
+  // Insert backup log into Supabase - append new row instead of upsert
   try {
-    await supabase.from('log_backup').upsert({
+    await supabase.from('log_backup').insert({
       guild_id: guildId,
       command_used: commandName,
       reason: reason,
@@ -67,7 +84,7 @@ export async function logCommand({
       used_at: usedAt,
       used_in: new Date(message.createdTimestamp),
       is_modch: isModch,
-    }, { onConflict: 'guild_id' });
+    });
   } catch (err) {
     console.error('Error inserting log_backup:', err);
   }
