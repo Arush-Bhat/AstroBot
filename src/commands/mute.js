@@ -181,7 +181,7 @@ async function execute(client, message, args, supabase) {
     try {
       mutedRole = await guild.roles.create({
         name: 'Muted',
-        color: 'GRAY',
+        color: '#646464',
         reason: 'Muted role created for moderation.',
         permissions: [],
       });

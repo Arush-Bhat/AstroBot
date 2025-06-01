@@ -11,7 +11,7 @@ const data = {
 async function execute(client, message, args, supabase) {
   // Send initial embed while calculating
   const sent = await message.channel.send({
-    embeds: [cmdResponseEmbed('🏓 Calculating latency...')],
+    embeds: [cmdResponseEmbed('🏓 Calculating latency...', 'Latency Check')],
   });
 
   const messageLatency = sent.createdTimestamp - message.createdTimestamp;
