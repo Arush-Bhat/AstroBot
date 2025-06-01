@@ -5,8 +5,19 @@ export default async function interactionCreate(interaction, client) {
   if (!interaction.isButton()) return;
 
   if (interaction.customId === 'nickset_button') {
-    const member = interaction.guild.members.cache.get(interaction.user.id);
-    if (!member) return;
+    let member;
+    try {
+      // Fetch fresh member data to avoid stale cache issues
+      member = await interaction.guild.members.fetch(interaction.user.id);
+    } catch (err) {
+      console.error('❌ Failed to fetch member:', err);
+      return;
+    }
+
+    if (!member) {
+      console.error('❌ Member not found in guild');
+      return;
+    }
 
     console.log(`⚡ Nickname setup started for ${interaction.user.tag} in ${interaction.guild.name}`);
 
@@ -50,27 +61,31 @@ export default async function interactionCreate(interaction, client) {
       return;
     }
 
-    // Role hierarchy check
+    // Check bot permissions and role hierarchy
     const botMember = interaction.guild.members.me;
     const botHighest = botMember.roles.highest.position;
     const userHighest = member.roles.highest.position;
 
+    console.log('🔍 Bot permissions:', botMember.permissions.toArray());
+    console.log('🔍 Bot can Manage Roles:', botMember.permissions.has('ManageRoles'));
     console.log('🔍 Bot highest role position:', botHighest);
     console.log('🔍 roleToAdd position:', roleToAdd.position);
     console.log('🔍 roleToRemove position:', roleToRemove.position);
     console.log('🔍 User highest role position:', userHighest);
+    console.log('🔍 Member current roles:', member.roles.cache.map(r => `${r.name} (${r.position})`).join(', '));
 
     if (
+      !botMember.permissions.has('ManageRoles') ||
       roleToAdd.position >= botHighest ||
       roleToRemove.position >= botHighest ||
       userHighest >= botHighest
     ) {
       try {
         await interaction.user.send(
-          '❌ I can’t update your nickname or roles because of role hierarchy. Please contact an admin.'
+          '❌ I can’t update your nickname or roles because of permission or role hierarchy. Please contact an admin.'
         );
       } catch (_) {}
-      console.warn('⚠️ Role hierarchy prevents action on', interaction.user.tag);
+      console.warn('⚠️ Role hierarchy or permissions prevent action on', interaction.user.tag);
       return;
     }
 
