@@ -106,7 +106,12 @@ export default async function messageCreate(message, client) {
 
     // Handle command logging
     if (result?.log) {
-      await logCommand(client, result.log);
+      await logCommand({
+        client,
+        supabase,
+        message: result.message ?? message, // fallback to main message if result.message is missing
+        ...result.log,
+      });
     } else {
       const userMentionMatch = args[0]?.match(/^<@!?(\d+)>$/);
       const targetUserId = userMentionMatch?.[1] ?? null;

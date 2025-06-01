@@ -1,6 +1,7 @@
 import { EmbedBuilder } from 'discord.js';
 import supabase from '../supabaseClient.js';
 import { isModerator } from '../utils/permissions.js';
+import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 
 const permissionLevel = 'Mod';
 
@@ -12,6 +13,7 @@ const data = {
 
 async function execute(client, message, args, supabase) {
   console.log('✅ Command reactroles.js executed with args:', args);
+  
   const { data: guild_settings } = await supabase
     .from('guild_settings')
     .select('mod_role_id, admin_role_id')
@@ -69,7 +71,7 @@ async function execute(client, message, args, supabase) {
   }
 
   function parseRoles(str) {
-    const regex = /\(([^:]+):(<@&\d+>)\)/g;
+    const regex = /\(\s*([^\s:()]+)\s*:\s*(<@&\d+>)\s*\)/g;
     const mappings = {};
     let match;
     while ((match = regex.exec(str)) !== null) {
@@ -157,11 +159,33 @@ async function execute(client, message, args, supabase) {
 
   const togglable = parseConfig(argsStr);
 
+  // Delete old reaction role message for the same guild+channel
+  const { data: existing } = await supabase
+    .from('reaction_roles')
+    .select('message_id')
+    .eq('guild_id', message.guild.id)
+    .eq('channel_id', channel.id)
+    .single();
+
+  if (existing) {
+    try {
+      const oldMsg = await channel.messages.fetch(existing.message_id).catch(() => null);
+      if (oldMsg) await oldMsg.delete();
+    } catch (err) {
+      console.warn('Failed to delete old reaction role message:', err);
+    }
+
+    await supabase
+      .from('reaction_roles')
+      .delete()
+      .eq('guild_id', message.guild.id)
+      .eq('channel_id', channel.id);
+  }
+
   const post = await channel.send(messageText);
 
   for (const emoji of Object.keys(mappings)) {
     try {
-      console.log(`Reacting with emoji: [${emoji}]`);
       await post.react(emoji);
     } catch (err) {
       console.warn(`Failed to react with emoji ${emoji}`, err);
@@ -196,8 +220,9 @@ async function execute(client, message, args, supabase) {
     },
     log: {
       action: 'reactionrole_created',
+      executorUserId: message.author.id,
+      executorTag: message.author.tag,
       guildId: message.guild.id,
-      createdBy: message.author.id,
       channelId: channel.id,
       messageId: post.id,
       mappings,
