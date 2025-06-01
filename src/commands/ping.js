@@ -18,8 +18,8 @@ async function execute(client, message, args, supabase) {
   const apiLatency = Math.round(client.ws.ping);
 
   const embed = cmdResponseEmbed()
-    .setTitle('🏓 Ping | Latency Check')
-    .setDescription(null)
+    .setTitle('🏓 Ping | Latency Check');
+    .setDescription(' ');
     .addFields(
       { name: 'Message Latency', value: `${messageLatency}ms`, inline: true },
       { name: 'API Latency', value: `${apiLatency}ms`, inline: true }
