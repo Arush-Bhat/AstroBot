@@ -225,8 +225,8 @@ async function execute(client, message, args, supabase) {
       guildId: message.guild.id,
       channelId: channel.id,
       messageId: post.id,
-      mappings,
-      togglable,
+      mappings: JSON.stringify(mappings),
+      togglable: togglable.toString(),
       timestamp: new Date().toISOString(),
     },
   };
