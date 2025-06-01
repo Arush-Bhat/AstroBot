@@ -11,12 +11,9 @@ export default async function interactionCreate(interaction, client) {
     console.log(`⚡ Nickname setup started for ${interaction.user.tag} in ${interaction.guild.name}`);
 
     try {
-      await interaction.reply({
-        content: '📩 Check your DMs to continue.',
-        flags: 64, // ephemeral
-      });
+      await interaction.deferReply({ ephemeral: true });
     } catch (err) {
-      console.error('❌ Failed to reply to interaction:', err);
+      console.error('❌ Failed to defer interaction:', err);
       return;
     }
 
@@ -80,6 +77,10 @@ export default async function interactionCreate(interaction, client) {
     try {
       const dm = await interaction.user.createDM();
       await dm.send('📛 Please enter your **real name**. This will be set as your nickname.');
+
+      await interaction.editReply({
+        content: '📩 Check your DMs to continue.',
+      });
 
       const filter = m => m.author.id === interaction.user.id;
       const collected = await dm.awaitMessages({ filter, max: 1, time: 60000 });
