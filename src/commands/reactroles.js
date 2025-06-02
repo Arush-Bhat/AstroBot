@@ -13,7 +13,7 @@ const data = {
 
 async function execute(client, message, args, supabase) {
   console.log('✅ Command reactroles.js executed with args:', args);
-  
+
   const { data: guild_settings } = await supabase
     .from('guild_settings')
     .select('mod_role_id, admin_role_id')
@@ -47,7 +47,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  if (args.length < 3) {
+  if (args.length < 2) {
     return {
       reply: {
         embeds: [
@@ -105,6 +105,56 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // === Handle deletion mode ===
+  if (args.length >= 3 && /^\d+$/.test(args[1]) && args[2] === 'clear') {
+    const targetMessageId = args[1];
+
+    const { data: entry } = await supabase
+      .from('reaction_roles')
+      .select('*')
+      .eq('guild_id', message.guild.id)
+      .eq('channel_id', channel.id)
+      .eq('message_id', targetMessageId)
+      .single();
+
+    if (!entry) {
+      return {
+        reply: {
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setTitle('❌ Not Found')
+              .setDescription('No such reaction role message exists for this message ID.'),
+          ],
+        },
+      };
+    }
+
+    const oldMsg = await channel.messages.fetch(targetMessageId).catch(() => null);
+    if (oldMsg) await oldMsg.delete().catch(() => null);
+
+    await supabase
+      .from('reaction_roles')
+      .delete()
+      .eq('guild_id', message.guild.id)
+      .eq('channel_id', channel.id)
+      .eq('message_id', targetMessageId);
+
+    return {
+      reply: { content: `🗑️ Reaction role message \`${targetMessageId}\` deleted.` },
+      log: {
+        action: 'reactionrole_deleted',
+        executorUserId: message.author.id,
+        executorTag: message.author.tag,
+        guildId: message.guild.id,
+        channelId: channel.id,
+        messageId: targetMessageId,
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+
+  // === Continue with creation mode ===
   const argsStr = args.slice(1).join(' ');
 
   const messageText = parseParenArg(argsStr, 'msg');
@@ -158,29 +208,6 @@ async function execute(client, message, args, supabase) {
   }
 
   const togglable = parseConfig(argsStr);
-
-  // Delete old reaction role message for the same guild+channel
-  const { data: existing } = await supabase
-    .from('reaction_roles')
-    .select('message_id')
-    .eq('guild_id', message.guild.id)
-    .eq('channel_id', channel.id)
-    .single();
-
-  if (existing) {
-    try {
-      const oldMsg = await channel.messages.fetch(existing.message_id).catch(() => null);
-      if (oldMsg) await oldMsg.delete();
-    } catch (err) {
-      console.warn('Failed to delete old reaction role message:', err);
-    }
-
-    await supabase
-      .from('reaction_roles')
-      .delete()
-      .eq('guild_id', message.guild.id)
-      .eq('channel_id', channel.id);
-  }
 
   const post = await channel.send(messageText);
 
