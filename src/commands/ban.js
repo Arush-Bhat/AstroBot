@@ -94,11 +94,12 @@ async function execute(client, message, args, supabase) {
       .from('banned_users')
       .upsert({
         guild_id: guild.id,
-        user_id: target.id,
+        banned_user_id: target.id,    // Use banned_user_id (not user_id)
         reason,
         banned_by: message.author.id,
         banned_at: new Date().toISOString(),
       });
+
 
     if (error) {
       console.error('Supabase logging error:', error);

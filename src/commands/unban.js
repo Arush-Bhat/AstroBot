@@ -18,7 +18,7 @@ async function execute(client, message, args, supabase) {
           cmdErrorEmbed(
             'Invalid Usage',
             '❌ You must provide a user ID to unban.\n\nExample: `$unban 123456789012345678 Apologized for behavior`'
-          )
+          ),
         ],
       },
     };
@@ -38,7 +38,7 @@ async function execute(client, message, args, supabase) {
             cmdErrorEmbed(
               'Not Found',
               `❌ No banned user found with ID \`${userId}\`.`
-            )
+            ),
           ],
         },
       };
@@ -46,7 +46,17 @@ async function execute(client, message, args, supabase) {
 
     await message.guild.members.unban(userId, `Unbanned by ${message.author.tag}: ${reason}`);
 
-    const logReason = `${banInfo.user.tag} was unbanned by ${message.author.tag} for reason: "${reason}"`;
+    // Remove from banned_users table in Supabase
+    const { error } = await supabase
+      .from('banned_users')
+      .delete()
+      .eq('guild_id', message.guild.id)
+      .eq('banned_user_id', userId);
+
+    if (error) {
+      console.error('Supabase delete error:', error);
+      // You could optionally notify about this error here if needed
+    }
 
     return {
       reply: {
@@ -54,7 +64,7 @@ async function execute(client, message, args, supabase) {
           cmdResponseEmbed(
             'User Unbanned',
             `✅ **${banInfo.user.tag}** was unbanned.\n**Reason:** ${reason}`
-          )
+          ),
         ],
       },
       log: {
@@ -64,7 +74,7 @@ async function execute(client, message, args, supabase) {
         executorUserId: message.author.id,
         executorTag: message.author.tag,
         guildId: message.guild.id,
-        reason: logReason,
+        reason: `Unbanned for reason: ${reason}`,
         timestamp: new Date().toISOString(),
       },
     };
@@ -76,7 +86,7 @@ async function execute(client, message, args, supabase) {
           cmdErrorEmbed(
             'Action Failed',
             '❌ Failed to unban the user. Make sure the ID is correct and I have permission.'
-          )
+          ),
         ],
       },
     };
