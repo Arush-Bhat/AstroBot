@@ -1,4 +1,5 @@
 import { EmbedBuilder } from 'discord.js';
+import supabase from '../supabaseClient.js';
 import { isModerator } from '../utils/permissions.js';
 
 const permissionLevel = 'Mod';
@@ -13,23 +14,40 @@ const data = {
 
 async function execute(client, message, args, supabase) {
   console.log('✅ Command polls.js executed with args:', args);
-  const guildId = message.guild.id;
-  const authorId = message.author.id;
 
-  if (!(await isModerator(message.member))) {
+  const { data: guild_settings, error: guildError } = await supabase
+    .from('guild_settings')
+    .select('mod_role_id, admin_role_id')
+    .eq('guild_id', message.guild.id)
+    .single();
+
+  if (guildError || !guild_settings) {
+    return {
+      reply: {
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('❌ Error finding database')
+            .setDescription('Please contact a developer regarding this issue.'),
+        ],
+      },
+    };
+  }
+
+  if (!isModerator(message.member, guild_settings.mod_role_id, guild_settings.admin_role_id)) {
     return {
       reply: {
         embeds: [
           new EmbedBuilder()
             .setColor('Red')
             .setTitle('❌ Permission Denied')
-            .setDescription('You must be a moderator to use this command.'),
+            .setDescription('You need mod or admin privileges to use this command.'),
         ],
       },
     };
   }
 
-  // Utility parsing
+  // Utility parsing functions
   function parseParenArg(str, key) {
     const regex = new RegExp(`${key}\\("([^"]+)"\\)`);
     const match = str.match(regex);
@@ -52,7 +70,7 @@ async function execute(client, message, args, supabase) {
     return { multiple: match ? match[1] === 'true' : true };
   }
 
-  // 🛑 Conclude Poll
+  // === Conclude Poll ===
   if (args.length >= 3 && args[2].toLowerCase() === 'conclude') {
     const channelMention = args[0];
     const messageId = parseParenArg(args[1], 'msgId');
@@ -73,27 +91,27 @@ async function execute(client, message, args, supabase) {
     const channelId = channelMention.replace(/[<#>]/g, '');
     const channel = await message.guild.channels.fetch(channelId).catch(() => null);
 
-    if (!channel) {
+    if (!channel || !channel.isTextBased()) {
       return {
         reply: {
           embeds: [
             new EmbedBuilder()
               .setColor('Red')
               .setTitle('❌ Invalid Channel')
-              .setDescription('Make sure you mention a valid channel. Example: `#polls`'),
+              .setDescription('Make sure you mention a valid text channel. Example: `#polls`'),
           ],
         },
       };
     }
 
-    const { data, error } = await supabase
+    const { data: pollData, error: pollError } = await supabase
       .from('polls')
       .select('*')
-      .eq('guild_id', guildId)
+      .eq('guild_id', message.guild.id)
       .eq('message_id', messageId)
       .single();
 
-    if (error || !data) {
+    if (pollError || !pollData) {
       return {
         reply: {
           embeds: [
@@ -107,7 +125,7 @@ async function execute(client, message, args, supabase) {
     }
 
     try {
-      const pollMessage = await channel.messages.fetch(data.message_id);
+      const pollMessage = await channel.messages.fetch(pollData.message_id);
       const reactions = pollMessage.reactions.cache;
       const results = [];
 
@@ -121,9 +139,9 @@ async function execute(client, message, args, supabase) {
 
       const resultEmbed = new EmbedBuilder()
         .setTitle('📊 Poll Results')
-        .setDescription(data.title)
+        .setDescription(pollData.title)
         .addFields({ name: 'Results', value: stats })
-        .setFooter({ text: `Poll started at: ${new Date(data.created_at).toLocaleString()}` })
+        .setFooter({ text: `Poll started at: ${new Date(pollData.created_at).toLocaleString()}` })
         .setColor('Blue');
 
       await pollMessage.delete();
@@ -141,10 +159,10 @@ async function execute(client, message, args, supabase) {
         },
         log: {
           action: 'concludePoll',
-          pollTitle: data.title,
+          pollTitle: pollData.title,
           channelId: channel.id,
           messageId,
-          concludedBy: authorId,
+          concludedBy: message.author.id,
           timestamp: new Date().toISOString(),
         },
       };
@@ -163,7 +181,7 @@ async function execute(client, message, args, supabase) {
     }
   }
 
-  // ✅ Create Poll
+  // === Create Poll ===
   if (args.length < 3) {
     return {
       reply: {
@@ -173,8 +191,8 @@ async function execute(client, message, args, supabase) {
             .setTitle('❌ Invalid Syntax')
             .setDescription(
               'You must provide at least a channel, question, and two options.\n\n' +
-              '**Example:**\n' +
-              '`$polls #polls msg("Your question?") options((👍:"Yes"), (👎:"No")) config(multiple=false)`'
+                '**Example:**\n' +
+                '`$polls #polls msg("Your question?") options((👍:"Yes"), (👎:"No")) config(multiple=false)`'
             ),
         ],
       },
@@ -185,7 +203,7 @@ async function execute(client, message, args, supabase) {
   const channelId = channelMention.replace(/[<#>]/g, '');
   const channel = await message.guild.channels.fetch(channelId).catch(() => null);
 
-  if (!channel) {
+  if (!channel || !channel.isTextBased()) {
     return {
       reply: {
         embeds: [
@@ -248,7 +266,7 @@ async function execute(client, message, args, supabase) {
   }
 
   await supabase.from('polls').insert({
-    guild_id: guildId,
+    guild_id: message.guild.id,
     channel_id: channel.id,
     message_id: pollMessage.id,
     title: pollQuestion,
@@ -266,7 +284,7 @@ async function execute(client, message, args, supabase) {
       messageId: pollMessage.id,
       options,
       isMulti,
-      createdBy: authorId,
+      createdBy: message.author.id,
       timestamp: new Date().toISOString(),
     },
   };
