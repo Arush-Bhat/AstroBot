@@ -19,16 +19,19 @@ const data = {
 async function execute(client, message, args, supabase) {
   console.log('✅ Command nickset.js executed with args:', args);
   
+  // Parse channel and roles from mentions
   const channel = message.mentions.channels.first();
   const rolesMentioned = Array.from(message.mentions.roles.values());
   const memberRole = rolesMentioned[0];
   const visitorRole = rolesMentioned[1];
 
+  // Extract custom message and button text
   const msgMatch = message.content.match(/msg\((.*?)\)/);
   const btnMatch = message.content.match(/btn\((.*?)\)/);
   const msgText = msgMatch?.[1];
   const btnText = btnMatch?.[1];
 
+  // Validate all required arguments are provided
   if (!channel || !msgText || !btnText || !memberRole || !visitorRole) {
     return {
       reply: {
@@ -43,13 +46,14 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Ensure guild_settings row exists
+  // Ensure a row exists in guild_settings for this guild
   const { data: existing, error: fetchError } = await supabase
     .from('guild_settings')
     .select('nick_message_id')
     .eq('guild_id', message.guild.id)
     .single();
 
+  // Log and report any unexpected fetch errors (ignore "row not found" error)
   if (fetchError && fetchError.code !== 'PGRST116') {
     console.error('❌ Supabase fetch error:', fetchError.message);
     return {
@@ -59,7 +63,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Try deleting the previous nickset message if it exists
+  // Delete the previously sent nickset message, if it exists
   if (existing?.nick_message_id) {
     try {
       const oldMsg = await channel.messages.fetch(existing.nick_message_id);
@@ -72,7 +76,7 @@ async function execute(client, message, args, supabase) {
     }
   }
 
-  // Create new button
+  // Create a new button with custom label and style
   const button = new ButtonBuilder()
     .setCustomId('nickset_button')
     .setLabel(btnText)
@@ -80,7 +84,7 @@ async function execute(client, message, args, supabase) {
 
   const row = new ActionRowBuilder().addComponents(button);
 
-  // Send new message
+  // Send the message with the button in the specified channel
   let sent;
   try {
     sent = await channel.send({
@@ -96,7 +100,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Insert or update guild_settings with new message and role IDs
+  // Save or update the message ID and role IDs in the database
   const { error: upsertError } = await supabase
     .from('guild_settings')
     .upsert(
@@ -109,6 +113,7 @@ async function execute(client, message, args, supabase) {
       { onConflict: 'guild_id' }
     );
 
+  // Handle database upsert errors
   if (upsertError) {
     console.error('❌ Supabase upsert error (nick_message_id & roles):', upsertError);
     return {
@@ -118,6 +123,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Confirm success to the admin
   return {
     reply: {
       embeds: [

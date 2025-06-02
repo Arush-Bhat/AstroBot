@@ -1,6 +1,7 @@
 import supabase from '../supabaseClient.js';
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 
+// Only users with Admin-level permission can use this command
 const permissionLevel = 'Admin';
 
 const data = {
@@ -13,7 +14,7 @@ async function execute(client, message, args, supabase) {
   console.log('✅ Command setmem.js executed with args:', args);
   const guildId = message.guild.id;
 
-  // Check if user has administrator permission
+  // Check if the user has Administrator permission
   if (!message.member.permissions.has('Administrator')) {
     return {
       reply: {
@@ -28,6 +29,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Attempt to get the mentioned role from the message
   const role = message.mentions.roles.first();
   if (!role) {
     return {
@@ -43,12 +45,13 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Save member role to Supabase
+  // Save or update the member role ID in the 'guild_settings' table
   const { error } = await supabase
     .from('guild_settings')
-    .upsert({ guild_id: guildId, member_role_id: role.id })
-    .eq('guild_id', guildId);
+    .upsert({ guild_id: guildId, member_role_id: role.id }) // Upsert ensures insert or update
+    .eq('guild_id', guildId); // Ensure it's for the correct guild
 
+  // Handle potential database error
   if (error) {
     console.error('❌ Supabase error:', error);
     return {
@@ -64,6 +67,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Respond with confirmation embed and log the action
   return {
     reply: {
       embeds: [

@@ -28,8 +28,10 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Get the first mentioned role from the message
   const role = message.mentions.roles.first();
   if (!role) {
+    // If no role was mentioned, send an error embed with usage instructions
     return {
       reply: {
         embeds: [
@@ -43,13 +45,15 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Save visitor role to Supabase
+  // Save or update the visitor role for this guild in the 'guild_settings' table
+  // Use upsert to insert or update based on guild_id
   const { error } = await supabase
     .from('guild_settings')
     .upsert({ guild_id: guildId, visitor_role_id: role.id })
     .eq('guild_id', guildId);
 
   if (error) {
+    // Log and respond with a database error embed if the upsert fails
     console.error('❌ Supabase error:', error);
     return {
       reply: {
@@ -64,6 +68,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Success response embed confirming the visitor role has been set
   return {
     reply: {
       embeds: [
@@ -73,6 +78,7 @@ async function execute(client, message, args, supabase) {
         ),
       ],
     },
+    // Log object to be used for audit or moderation logs elsewhere
     log: {
       action: 'setVisitorRole',
       roleId: role.id,

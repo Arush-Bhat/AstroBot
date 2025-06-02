@@ -15,6 +15,7 @@ const data = {
 async function execute(client, message, args, supabase) {
   console.log('✅ Command polls.js executed with args:', args);
 
+  // Fetch mod/admin role IDs from the database
   const { data: guild_settings, error: guildError } = await supabase
     .from('guild_settings')
     .select('mod_role_id, admin_role_id')
@@ -34,6 +35,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Check if user has mod or admin privileges
   if (!isModerator(message.member, guild_settings.mod_role_id, guild_settings.admin_role_id)) {
     return {
       reply: {
@@ -47,15 +49,17 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Utility functions
+  // === Utility Functions ===
+
+  // Extracts value from syntax like: key("value")
   function parseParenArg(str, key) {
     const regex = new RegExp(`${key}\\("([^"]+)"\\)`);
     const match = str.match(regex);
     return match ? match[1] : null;
   }
 
+  // Parses options from format like: options((emoji:"text"), ...)
   function parseOptions(str) {
-    // Matches (emoji:"text") pairs, capturing emoji and text inside parentheses
     const regex = /\(\s*([^:()]+)\s*:\s*"([^"]+)"\s*\)/g;
     const options = [];
     let match;
@@ -65,6 +69,7 @@ async function execute(client, message, args, supabase) {
     return options;
   }
 
+  // Parses poll config from syntax like: config(multiple=true)
   function parseConfig(str) {
     const regex = /config\(multiple=(true|false)\)/;
     const match = str.match(regex);
@@ -76,6 +81,7 @@ async function execute(client, message, args, supabase) {
   if (isConclude && /^\d{17,20}$/.test(args[0])) {
     const messageId = args[0];
 
+    // Fetch poll from database
     const { data: pollData, error: pollError } = await supabase
       .from('polls')
       .select('*')
@@ -96,6 +102,7 @@ async function execute(client, message, args, supabase) {
       };
     }
 
+    // Fetch the channel where the poll was created
     const channel = await message.guild.channels.fetch(pollData.channel_id).catch(() => null);
 
     if (!channel || !channel.isTextBased()) {
@@ -116,17 +123,20 @@ async function execute(client, message, args, supabase) {
       const reactions = pollMessage.reactions.cache;
       const results = [];
 
+      // Count votes (excluding bot reactions)
       for (const [emoji, reaction] of reactions) {
         const count = (await reaction.users.fetch()).filter((u) => !u.bot).size;
         results.push({ emoji, count });
       }
 
+      // Sort and format results
       const sorted = results.sort((a, b) => b.count - a.count);
       const stats = sorted.map((r) => `${r.emoji}: ${r.count}`).join('\n') || 'No votes received.';
 
-      // Fix for invalid Date: use pollData.created_at if valid, else fallback to current date
+      // Format timestamp safely
       const createdAt = pollData.created_at ? new Date(pollData.created_at) : new Date();
 
+      // Create and send results embed
       const resultEmbed = new EmbedBuilder()
         .setTitle('📊 Poll Results')
         .setDescription(pollData.texts.question)
@@ -134,9 +144,9 @@ async function execute(client, message, args, supabase) {
         .setFooter({ text: `Poll started at: ${createdAt.toLocaleString()}` })
         .setColor('Blue');
 
-      await pollMessage.delete();
-      await channel.send({ embeds: [resultEmbed] });
-      await supabase.from('polls').delete().eq('message_id', messageId);
+      await pollMessage.delete(); // Delete original poll message
+      await channel.send({ embeds: [resultEmbed] }); // Post results
+      await supabase.from('polls').delete().eq('message_id', messageId); // Remove from DB
 
       return {
         reply: {
@@ -153,7 +163,6 @@ async function execute(client, message, args, supabase) {
           channelId: channel.id,
           messageId,
           concludedBy: message.author.id,
-          // Removed reference to undefined targetMessageId; replaced with messageId for clarity
           reason: `Poll message deleted by ${message.author.tag} using $polls ${messageId} conclude.`,
           timestamp: new Date().toISOString(),
         },
@@ -174,6 +183,8 @@ async function execute(client, message, args, supabase) {
   }
 
   // === CREATE POLL ===
+
+  // Require at least channel, question, and 2 options
   if (args.length < 3) {
     return {
       reply: {
@@ -191,6 +202,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Resolve channel from mention
   const channelMention = args[0];
   const channelId = channelMention.replace(/[<#>]/g, '');
   const channel = await message.guild.channels.fetch(channelId).catch(() => null);
@@ -208,12 +220,14 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Parse poll arguments
   const argsStr = args.slice(1).join(' ');
   const pollQuestion = parseParenArg(argsStr, 'msg');
   const options = parseOptions(argsStr);
   const config = parseConfig(argsStr);
   const isMulti = config.multiple ?? true;
 
+  // Ensure question exists
   if (!pollQuestion) {
     return {
       reply: {
@@ -227,6 +241,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Require at least 2 poll options
   if (options.length < 2) {
     return {
       reply: {
@@ -240,6 +255,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Build and send poll embed
   const embed = new EmbedBuilder()
     .setTitle('🗳️ New Poll')
     .setDescription(pollQuestion)
@@ -249,6 +265,7 @@ async function execute(client, message, args, supabase) {
 
   const pollMessage = await channel.send({ embeds: [embed] });
 
+  // React with each emoji option
   for (const { emoji } of options) {
     try {
       await pollMessage.react(emoji);
@@ -257,6 +274,7 @@ async function execute(client, message, args, supabase) {
     }
   }
 
+  // Save poll in database
   await supabase.from('polls').insert({
     guild_id: message.guild.id,
     channel_id: channel.id,

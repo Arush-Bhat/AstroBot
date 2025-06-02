@@ -11,7 +11,8 @@ const data = {
 
 async function execute(client, message, args, supabase) {
   console.log('✅ Command derole.js executed with args:', args);
-  // Permission check for Manage Roles
+
+  // Check if the command executor has the Manage Roles permission
   if (!message.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
     return {
       reply: {
@@ -25,6 +26,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Validate the number of arguments, require at least a user and a role mention
   if (args.length < 2) {
     return {
       reply: {
@@ -39,16 +41,18 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Extract user ID and role ID from mentions by removing special characters
   const userMention = args[0];
   const roleMention = args[1];
-
   const userId = userMention.replace(/[<@!>]/g, '');
   const roleId = roleMention.replace(/[<@&>]/g, '');
 
+  // Attempt to fetch the member from the guild using the user ID
   let member;
   try {
     member = await message.guild.members.fetch(userId);
   } catch {
+    // If fetching fails, return an error about invalid user
     return {
       reply: {
         embeds: [
@@ -62,8 +66,10 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Get the role object from the guild's cache by role ID
   const role = message.guild.roles.cache.get(roleId);
   if (!role) {
+    // If role doesn't exist, return an error
     return {
       reply: {
         embeds: [
@@ -77,6 +83,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Check if the bot itself has Manage Roles permission in the guild
   if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
     return {
       reply: {
@@ -90,7 +97,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Check role hierarchy (bot)
+  // Check if the role to remove is lower than the bot's highest role (hierarchy check)
   const botHighestRole = message.guild.members.me.roles.highest;
   if (role.position >= botHighestRole.position) {
     return {
@@ -105,7 +112,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Check role hierarchy (author)
+  // Check if the command executor's highest role is higher than the role to remove
   const authorHighestRole = message.member.roles.highest;
   if (role.position >= authorHighestRole.position) {
     return {
@@ -121,6 +128,7 @@ async function execute(client, message, args, supabase) {
   }
 
   try {
+    // Check if the member actually has the role before attempting removal
     if (!member.roles.cache.has(role.id)) {
       return {
         reply: {
@@ -134,8 +142,10 @@ async function execute(client, message, args, supabase) {
       };
     }
 
+    // Remove the role from the member
     await member.roles.remove(role);
 
+    // Return success response with details and logging info
     return {
       reply: {
         embeds: [
@@ -158,6 +168,7 @@ async function execute(client, message, args, supabase) {
       },
     };
   } catch (error) {
+    // Catch any unexpected errors during role removal and return a generic failure message
     console.error('Error removing role:', error);
     return {
       reply: {

@@ -1,6 +1,7 @@
 import supabase from '../supabaseClient.js';
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 
+// Only users with Admin permission can use this command
 const permissionLevel = 'Admin';
 
 const data = {
@@ -13,7 +14,7 @@ async function execute(client, message, args, supabase) {
   console.log('✅ Command setmod.js executed with args:', args);
   const guildId = message.guild.id;
 
-  // Check if user has administrator permission
+  // Check if user has Administrator permission
   if (!message.member.permissions.has('Administrator')) {
     return {
       reply: {
@@ -28,6 +29,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Get the first mentioned role in the message
   const role = message.mentions.roles.first();
   if (!role) {
     return {
@@ -43,12 +45,13 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Save role to Supabase
+  // Save the moderator role ID to the `guild_settings` table in Supabase
   const { error } = await supabase
     .from('guild_settings')
     .upsert({ guild_id: guildId, mod_role_id: role.id })
-    .eq('guild_id', guildId);
+    .eq('guild_id', guildId); // Ensure only one entry per guild
 
+  // Handle database error
   if (error) {
     console.error(error);
     return {
@@ -64,6 +67,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Respond with a success embed and include logging metadata
   return {
     reply: {
       embeds: [

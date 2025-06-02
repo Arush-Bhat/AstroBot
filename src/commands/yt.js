@@ -49,7 +49,7 @@ async function execute(client, message, args, supabase) {
   const channelMention = message.mentions.channels.first();
 
   // Regex for YouTube channel URLs
-  const ytUrlPattern = /^https?:\/\/(www\.)?youtube\.com\/(c\/|@|channel\/)?[a-zA-Z0-9_\-]+/i;
+  const ytUrlPattern = /^https?:\/\/(www\.)?youtube\.com\/(channel\/[A-Za-z0-9_\-]{24}|c\/[A-Za-z0-9_\-]+|@[\w\-]+)(\/.*)?$/i;
 
   if (channelMention) {
     const { error } = await supabase

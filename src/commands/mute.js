@@ -1,7 +1,9 @@
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 
+// Set required permission level to 'Mod' for this command
 const permissionLevel = 'Mod';
 
+// Command metadata
 const data = {  
   name: 'mute',
   description: 'Mute a user for a specified duration (1min to 24hrs). Default is 2 mins. Moderator-level command.',
@@ -14,6 +16,7 @@ async function execute(client, message, args, supabase) {
   const member = message.member;
   const guildId = guild.id;
 
+  // Fetch mod and admin role IDs from Supabase
   const { data: settings, error } = await supabase
     .from('guild_settings')
     .select('mod_role_id, admin_role_id')
@@ -37,6 +40,7 @@ async function execute(client, message, args, supabase) {
   const modRoleId = settings?.mod_role_id;
   const adminRoleId = settings?.admin_role_id;
 
+  // Ensure mod role is set up
   if (!modRoleId) {
     return {
       reply: {
@@ -50,6 +54,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Check if the executor has permission (mod/admin role or admin permission)
   if (
     !member.roles.cache.has(modRoleId) &&
     !member.roles.cache.has(adminRoleId) &&
@@ -68,6 +73,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Ensure user is mentioned
   if (args.length < 1) {
     return {
       reply: {
@@ -95,6 +101,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Prevent muting the server owner
   if (target.id === guild.ownerId) {
     return {
       reply: {
@@ -108,6 +115,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Prevent muting users with equal or higher roles (unless executor is server owner)
   if (
     target.roles.highest.position >= member.roles.highest.position &&
     message.author.id !== guild.ownerId
@@ -125,7 +133,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Duration handling
+  // Duration parsing (default 2 mins if not provided)
   let durationMs = 2 * 60 * 1000; // Default 2 minutes
   if (args[1]) {
     const match = args[1].toLowerCase().match(/^(\d+)(min|mins|hr|hrs|hour|hours)$/);
@@ -158,10 +166,12 @@ async function execute(client, message, args, supabase) {
       };
     }
 
+    // Convert to milliseconds
     durationMs = unit.startsWith('min')
       ? amount * 60 * 1000
       : amount * 60 * 60 * 1000;
 
+    // Enforce maximum limit of 24 hours
     if (durationMs > 24 * 60 * 60 * 1000) {
       return {
         reply: {
@@ -176,7 +186,7 @@ async function execute(client, message, args, supabase) {
     }
   }
 
-  // Get or create muted role
+  // Find or create the "Muted" role
   let mutedRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'muted');
   if (!mutedRole) {
     try {
@@ -187,6 +197,7 @@ async function execute(client, message, args, supabase) {
         permissions: [],
       });
 
+      // Update channel permissions to prevent messaging/reacting/speaking
       for (const [, channel] of guild.channels.cache) {
         if (channel.isTextBased?.()) {
           await channel.permissionOverwrites.edit(mutedRole, {
@@ -211,6 +222,7 @@ async function execute(client, message, args, supabase) {
     }
   }
 
+  // Check if user is already muted
   if (target.roles.cache.has(mutedRole.id)) {
     return {
       reply: {
@@ -224,6 +236,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Add Muted role to the user
   try {
     await target.roles.add(mutedRole, `Muted by ${message.author.tag} for ${durationMs / 60000} minutes.`);
   } catch (err) {
@@ -240,6 +253,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Schedule role removal after duration
   setTimeout(async () => {
     try {
       const refreshedTarget = await guild.members.fetch(target.id).catch(() => null);
@@ -251,6 +265,7 @@ async function execute(client, message, args, supabase) {
     }
   }, durationMs);
 
+  // Send confirmation embed and log action
   return {
     reply: {
       embeds: [

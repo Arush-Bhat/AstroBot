@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits } from 'discord.js';
 import dotenv from 'dotenv';
 import express from 'express';
 import { setupHandlers } from './src/events/loader.js';
+import { checkYouTubeUpdates } from './src/utils/ytchecker.js';  // adjust path if needed
 
 dotenv.config();
 
@@ -20,6 +21,14 @@ const client = new Client({
 
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
+
+  // Run once immediately
+  checkYouTubeUpdates(client).catch(console.error);
+
+  // Repeat every 5 minutes
+  setInterval(() => {
+    checkYouTubeUpdates(client).catch(console.error);
+  }, 5 * 60 * 1000);
 });
 
 setupHandlers(client);
@@ -38,3 +47,4 @@ client.login(process.env.DISCORD_BOT_TOKEN).catch(err => {
 process.on('unhandledRejection', error => {
   console.error('Unhandled promise rejection:', error);
 });
+

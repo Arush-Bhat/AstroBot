@@ -13,7 +13,7 @@ async function execute(client, message, args, supabase) {
   const guild = message.guild;
   const member = message.member;
 
-  // Fetch mod and admin roles from Supabase
+  // Fetch mod and admin roles from Supabase database for the current guild
   const { data: settings, error } = await supabase
     .from('guild_settings')
     .select('mod_role_id, admin_role_id')
@@ -21,6 +21,7 @@ async function execute(client, message, args, supabase) {
     .single();
 
   if (error) {
+    // If database query fails, send an error embed
     console.error(error);
     return {
       reply: {
@@ -37,6 +38,7 @@ async function execute(client, message, args, supabase) {
   const modRoleId = settings?.mod_role_id;
   const adminRoleId = settings?.admin_role_id;
 
+  // If mod role is not set in the database, instruct user to set it
   if (!modRoleId) {
     return {
       reply: {
@@ -51,12 +53,13 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Check if user is mod or admin
+  // Check if the command user has mod role, admin role, or Administrator permission
   if (
     !member.roles.cache.has(modRoleId) &&
     !member.roles.cache.has(adminRoleId) &&
     !member.permissions.has('Administrator')
   ) {
+    // If not authorized, send permission denied embed
     return {
       reply: {
         embeds: [
@@ -70,7 +73,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Must have at least 2 args: @user and "reason"
+  // Ensure at least two arguments are provided: user mention and reason
   if (args.length < 2) {
     return {
       reply: {
@@ -85,9 +88,10 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Get target user from mention
+  // Get the mentioned target user/member to kick
   const target = message.mentions.members.first();
   if (!target) {
+    // If no valid user mention, send invalid user error
     return {
       reply: {
         embeds: [
@@ -100,12 +104,14 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Extract reason — everything after the mention as a quoted string
-  // Join args after mention and match quoted text
+  // Extract the reason string inside quotes after the mention
+  // Slice out the mention part and join the rest as a string
   const argsStr = message.content.split(' ').slice(2).join(' ').trim();
+  // Match the entire string enclosed in quotes
   const reasonMatch = argsStr.match(/^"(.+)"$/);
 
   if (!reasonMatch) {
+    // If no valid quoted reason found, send missing reason error
     return {
       reply: {
         embeds: [
@@ -120,7 +126,7 @@ async function execute(client, message, args, supabase) {
 
   const reason_given = reasonMatch[1];
 
-  // Check if target is server owner
+  // Prevent kicking the server owner
   if (target.id === guild.ownerId) {
     return {
       reply: {
@@ -134,7 +140,8 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Check that target is lower than command user in role hierarchy
+  // Ensure the target's highest role is lower than the command user's highest role
+  // Owner is exempt from this check
   if (target.roles.highest.position >= member.roles.highest.position && message.author.id !== guild.ownerId) {
     return {
       reply: {
@@ -150,7 +157,7 @@ async function execute(client, message, args, supabase) {
   }
 
   try {
-    // Send DM before kicking
+    // Attempt to send DM to the target user before kicking
     const dmEmbed = {
       title: 'You Have Been Kicked',
       description:
@@ -165,11 +172,14 @@ async function execute(client, message, args, supabase) {
     };
 
     await target.send({ embeds: [dmEmbed] }).catch(() => {
+      // If DM fails (e.g. user closed DMs), log a warning but continue
       console.warn(`Could not DM ${target.user.tag} before kicking.`);
     });
 
+    // Kick the target user from the guild with reason in audit log
     await target.kick(`Kicked by ${message.author.tag}: ${reason_given}`);
 
+    // Return success response embed and logging info
     return {
       reply: {
         embeds: [
@@ -191,6 +201,7 @@ async function execute(client, message, args, supabase) {
       },
     };
   } catch (err) {
+    // Catch any errors during kick and send failure embed
     console.error(err);
     return {
       reply: {

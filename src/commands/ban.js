@@ -16,6 +16,7 @@ async function execute(client, message, args, supabase) {
   // Get the mentioned user to ban
   const target = message.mentions.members.first();
   if (!target) {
+    // No valid user mentioned, return error embed
     return {
       reply: {
         embeds: [
@@ -29,7 +30,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Check if target is server owner
+  // Prevent banning the server owner
   if (target.id === guild.ownerId) {
     return {
       reply: {
@@ -44,7 +45,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Check role hierarchy: target must be lower than command user or author is owner
+  // Check role hierarchy: command issuer must have higher role than target, unless owner
   if (
     target.roles.highest.position >= member.roles.highest.position &&
     message.author.id !== guild.ownerId
@@ -62,7 +63,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Extract reason: everything after the mention, fallback default
+  // Extract reason for ban: everything after the mention in the message content
   const mentionIndex = message.content.indexOf('>');
   const reason =
     mentionIndex !== -1
@@ -70,7 +71,7 @@ async function execute(client, message, args, supabase) {
       : 'No reason provided';
 
   try {
-    // Send DM before banning
+    // Prepare DM embed to notify the user before banning
     const dmEmbed = {
       title: 'You Have Been Banned',
       description:
@@ -83,13 +84,15 @@ async function execute(client, message, args, supabase) {
       color: 0xff0000
     };
 
+    // Attempt to send DM to target user before banning; catch if unable
     await target.send({ embeds: [dmEmbed] }).catch(() => {
       console.warn(`Could not DM ${target.user.tag} before banning.`);
     });
 
+    // Ban the target member with reason including executor's tag
     await target.ban({ reason: `Banned by ${message.author.tag}: ${reason}` });
 
-    // Log to Supabase banned_users table
+    // Log ban details into Supabase 'banned_users' table with upsert (insert or update)
     const { error } = await supabase
       .from('banned_users')
       .upsert({
@@ -100,12 +103,13 @@ async function execute(client, message, args, supabase) {
         banned_at: new Date().toISOString(),
       });
 
-
+    // Log any database error, optionally could notify admins
     if (error) {
       console.error('Supabase logging error:', error);
       // Optional: Could notify in a warning embed here if you want
     }
 
+    // Return success embed and log info for further processing if needed
     return {
       reply: {
         embeds: [
@@ -127,6 +131,7 @@ async function execute(client, message, args, supabase) {
       },
     };
   } catch (err) {
+    // Catch any errors during the ban process, such as missing permissions
     console.error('Ban failed:', err);
     return {
       reply: {

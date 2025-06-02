@@ -1,7 +1,9 @@
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 
+// Required permission level to run this command
 const permissionLevel = 'Admin';
 
+// Command metadata
 const data = {
   name: 'modlog',
   description: 'Set or view the moderator log channel. Admin-only command.',
@@ -13,7 +15,7 @@ async function execute(client, message, args, supabase) {
   const guildId = message.guild.id;
   const member = message.member;
 
-  // Fetch admin role
+  // Fetch the admin role ID for this guild from the database
   const { data: adminData, error: adminError } = await supabase
     .from('guild_settings')
     .select('admin_role_id')
@@ -37,6 +39,7 @@ async function execute(client, message, args, supabase) {
 
   const adminRoleId = adminData?.admin_role_id;
 
+  // Check if an admin role is configured
   if (!adminRoleId) {
     return {
       reply: {
@@ -51,6 +54,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Check if the user has the admin role or ADMINISTRATOR permissions
   if (!member.roles.cache.has(adminRoleId) && !member.permissions.has('ADMINISTRATOR')) {
     return {
       reply: {
@@ -64,7 +68,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // If no args, show current modlog channel
+  // If no arguments are provided, display the currently set modlog channel
   if (args.length === 0) {
     const { data, error } = await supabase
       .from('guild_settings')
@@ -101,7 +105,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Validate channel mention
+  // If an argument is provided, validate that it's a proper channel mention
   const channelMention = args[0];
   const channelIdMatch = channelMention.match(/^<#(\d+)>$/);
   if (!channelIdMatch) {
@@ -120,6 +124,7 @@ async function execute(client, message, args, supabase) {
   const channelId = channelIdMatch[1];
   const channel = message.guild.channels.cache.get(channelId);
 
+  // Check if the mentioned channel exists in the server
   if (!channel) {
     return {
       reply: {
@@ -134,13 +139,14 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Upsert modlog_channel_id
+  // Check if guild settings already exist in the database
   const { data: existing, error: fetchError } = await supabase
     .from('guild_settings')
     .select('guild_id')
     .eq('guild_id', guildId)
     .single();
 
+  // If error other than "no rows", return a database error
   if (fetchError && fetchError.code !== 'PGRST116') {
     console.error(fetchError);
     return {
@@ -155,6 +161,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // If record exists, update the modlog channel
   if (existing) {
     const { error: updateError } = await supabase
       .from('guild_settings')
@@ -175,6 +182,7 @@ async function execute(client, message, args, supabase) {
       };
     }
   } else {
+    // If no record exists, insert a new one with the modlog channel
     const { error: insertError } = await supabase
       .from('guild_settings')
       .insert({ guild_id: guildId, modlog_channel_id: channelId });
@@ -194,6 +202,7 @@ async function execute(client, message, args, supabase) {
     }
   }
 
+  // Successfully set the modlog channel
   return {
     reply: {
       embeds: [
@@ -203,6 +212,7 @@ async function execute(client, message, args, supabase) {
         ),
       ],
     },
+    // Log object for internal use or audit purposes
     log: {
       action: 'modlog_set',
       executorUserId: message.author.id,

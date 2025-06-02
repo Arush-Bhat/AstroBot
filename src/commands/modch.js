@@ -1,7 +1,9 @@
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 
+// Permission level required to use this command
 const permissionLevel = 'Admin';
 
+// Command metadata
 const data = {
   name: 'modch',
   description: 'Set or view the mod commands channel. Admin-only command.',
@@ -13,7 +15,7 @@ async function execute(client, message, args, supabase) {
   const guildId = message.guild.id;
   const member = message.member;
 
-  // Fetch admin role
+  // Fetch admin role ID from the database for this guild
   const { data: adminData, error: adminError } = await supabase
     .from('guild_settings')
     .select('admin_role_id')
@@ -36,6 +38,7 @@ async function execute(client, message, args, supabase) {
 
   const adminRoleId = adminData?.admin_role_id;
 
+  // If no admin role is configured, prompt the user to set it up
   if (!adminRoleId) {
     return {
       reply: {
@@ -49,6 +52,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Check if the user has the admin role or Administrator permissions
   if (!member.roles.cache.has(adminRoleId) && !member.permissions.has('ADMINISTRATOR')) {
     return {
       reply: {
@@ -62,7 +66,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Fetch current modch channel
+  // Fetch the currently set mod commands channel (if any)
   const { data: settingsData, error: settingsError } = await supabase
     .from('guild_settings')
     .select('modch_channel_id')
@@ -86,7 +90,7 @@ async function execute(client, message, args, supabase) {
   const modchId = settingsData?.modch_channel_id;
   const modchChannel = modchId ? message.guild.channels.cache.get(modchId) : null;
 
-  // If no arguments: show current modch channel
+  // If no arguments are provided, show the currently set modch channel
   if (args.length === 0) {
     return {
       reply: {
@@ -100,7 +104,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Parse new channel
+  // Parse the mentioned channel from the first argument
   const channelMention = args[0];
   const channelIdMatch = channelMention.match(/^<#(\d+)>$/);
   if (!channelIdMatch) {
@@ -119,6 +123,7 @@ async function execute(client, message, args, supabase) {
   const channelId = channelIdMatch[1];
   const channel = message.guild.channels.cache.get(channelId);
 
+  // Check if the mentioned channel actually exists in the server
   if (!channel) {
     return {
       reply: {
@@ -132,13 +137,14 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Upsert modch_channel_id
+  // Check if the guild_settings row exists to decide between update or insert
   const { data: existing, error: fetchError } = await supabase
     .from('guild_settings')
     .select('guild_id')
     .eq('guild_id', guildId)
     .single();
 
+  // If the error is not "row not found", return a database error
   if (fetchError && fetchError.code !== 'PGRST116') {
     console.error(fetchError);
     return {
@@ -153,6 +159,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Update existing row with new modch channel ID
   if (existing) {
     const { error: updateError } = await supabase
       .from('guild_settings')
@@ -173,6 +180,7 @@ async function execute(client, message, args, supabase) {
       };
     }
   } else {
+    // Insert new row if no previous settings were found
     const { error: insertError } = await supabase
       .from('guild_settings')
       .insert({ guild_id: guildId, modch_channel_id: channelId });
@@ -192,6 +200,7 @@ async function execute(client, message, args, supabase) {
     }
   }
 
+  // Success: return confirmation and log the action
   return {
     reply: {
       embeds: [
@@ -213,6 +222,7 @@ async function execute(client, message, args, supabase) {
   };
 }
 
+// Export the command
 export default {
   data,
   permissionLevel,

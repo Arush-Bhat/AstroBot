@@ -13,12 +13,14 @@ const data = {
 async function execute(client, message, args, supabase) {
   console.log('✅ Command reactroles.js executed with args:', args);
 
+  // Fetch mod/admin role settings from Supabase
   const { data: guild_settings } = await supabase
     .from('guild_settings')
     .select('mod_role_id, admin_role_id')
     .eq('guild_id', message.guild.id)
     .single();
 
+  // Handle missing guild settings
   if (!guild_settings) {
     return {
       reply: {
@@ -32,6 +34,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Check if the user has mod or admin permissions
   const isMod = isModerator(message.member, guild_settings.mod_role_id, guild_settings.admin_role_id);
   if (!isMod) {
     return {
@@ -47,7 +50,7 @@ async function execute(client, message, args, supabase) {
   }
 
   // === UPDATED: Handle deletion mode ===
-  // Accept raw message ID as first arg (digits only), second arg "clear"
+  // If first argument is a message ID and second is "clear", enter deletion mode
   if (
     args.length >= 2 &&
     /^\d{17,20}$/.test(args[0]) &&
@@ -55,6 +58,7 @@ async function execute(client, message, args, supabase) {
   ) {
     const targetMessageId = args[0];
 
+    // Fetch reaction role entry from database
     const { data: entry } = await supabase
       .from('reaction_roles')
       .select('*')
@@ -62,6 +66,7 @@ async function execute(client, message, args, supabase) {
       .eq('message_id', targetMessageId)
       .single();
 
+    // If no such entry exists
     if (!entry) {
       return {
         reply: {
@@ -75,6 +80,7 @@ async function execute(client, message, args, supabase) {
       };
     }
 
+    // Try fetching the original channel and message
     const channel = await message.guild.channels.fetch(entry.channel_id).catch(() => null);
     if (!channel || !channel.isTextBased()) {
       return {
@@ -89,15 +95,18 @@ async function execute(client, message, args, supabase) {
       };
     }
 
+    // Attempt to delete the old message
     const oldMsg = await channel.messages.fetch(targetMessageId).catch(() => null);
     if (oldMsg) await oldMsg.delete().catch(() => null);
 
+    // Delete the entry from Supabase
     await supabase
       .from('reaction_roles')
       .delete()
       .eq('guild_id', message.guild.id)
       .eq('message_id', targetMessageId);
 
+    // Return success response and log the deletion
     return {
       reply: { content: `🗑️ Reaction role message \`${targetMessageId}\` deleted.` },
       log: {
@@ -115,6 +124,7 @@ async function execute(client, message, args, supabase) {
 
   // === Continue with creation mode ===
 
+  // Minimum 2 args expected (channel and other config)
   if (args.length < 2) {
     return {
       reply: {
@@ -132,12 +142,16 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // === Helper functions ===
+
+  // Extracts the value from a key("value") format
   function parseParenArg(str, key) {
     const regex = new RegExp(`${key}\\("([^"]+)"\\)`);
     const match = str.match(regex);
     return match ? match[1] : null;
   }
 
+  // Parses emoji-role pairs like (🔥:@role)
   function parseRoles(str) {
     const regex = /\(\s*([^\s:()]+)\s*:\s*(<@&\d+>)\s*\)/g;
     const mappings = {};
@@ -150,12 +164,14 @@ async function execute(client, message, args, supabase) {
     return mappings;
   }
 
+  // Parses toggle config: config(toggle=true/false)
   function parseConfig(str) {
     const regex = /config\(toggle=(true|false)\)/;
     const match = str.match(regex);
     return match ? match[1] === 'true' : false;
   }
 
+  // Extract and validate target channel
   const channelMention = args[0];
   const channelId = channelMention.replace(/[<#>]/g, '');
   const channel = await message.guild.channels.fetch(channelId).catch(() => null);
@@ -173,8 +189,10 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Merge remaining args for parsing
   const argsStr = args.slice(1).join(' ');
 
+  // Extract message content
   const messageText = parseParenArg(argsStr, 'msg');
   if (!messageText) {
     return {
@@ -189,6 +207,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Extract and validate role mappings
   const roleMappingsRaw = parseRoles(argsStr);
   if (Object.keys(roleMappingsRaw).length === 0) {
     return {
@@ -206,6 +225,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Validate roles and extract role IDs
   const mappings = {};
   for (const [emoji, roleMention] of Object.entries(roleMappingsRaw)) {
     const roleId = roleMention.replace(/[<@&>]/g, '');
@@ -225,10 +245,13 @@ async function execute(client, message, args, supabase) {
     mappings[emoji] = role.id;
   }
 
+  // Check if toggling is enabled
   const togglable = parseConfig(argsStr);
 
+  // Send the actual message to the channel
   const post = await channel.send(messageText);
 
+  // React with all specified emojis
   for (const emoji of Object.keys(mappings)) {
     try {
       await post.react(emoji);
@@ -237,6 +260,7 @@ async function execute(client, message, args, supabase) {
     }
   }
 
+  // Store the configuration in Supabase
   const { error } = await supabase.from('reaction_roles').insert({
     guild_id: message.guild.id,
     channel_id: channel.id,
@@ -245,6 +269,7 @@ async function execute(client, message, args, supabase) {
     togglable,
   });
 
+  // Handle database failure
   if (error) {
     console.error('Supabase error saving reaction roles:', error);
     return {
@@ -259,6 +284,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // Return success response and log the creation
   return {
     reply: {
       content: '✅ Reaction role message successfully created and saved!',
