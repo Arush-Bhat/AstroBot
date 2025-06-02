@@ -168,7 +168,7 @@ async function execute(client, message, args, supabase) {
         executorUserId: message.author.id,
         executorTag: message.author.tag,
         guildId: guild.id,
-        reason: `${target.user.tag} kicked by ${message.author.tag} for ${reason_given}`,
+        reason: `${target.user.tag} kicked by ${message.author.tag} for reason: \"${reason_given}\"`,
         timestamp: new Date().toISOString(),
       },
     };

@@ -115,7 +115,6 @@ export default async function messageCreate(message, client) {
     } else {
       const userMentionMatch = args[0]?.match(/^<@!?(\d+)>$/);
       const targetUserId = userMentionMatch?.[1] ?? null;
-      const reason = targetUserId ? args.slice(1).join(' ') : args.join(' ');
 
       await logCommand({
         client,
