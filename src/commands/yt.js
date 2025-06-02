@@ -96,9 +96,11 @@ async function execute(client, message, args, supabase) {
       },
     };
   }
-
-  // Handle YouTube URL
+  
   if (ytUrlPattern.test(args[0])) {
+    const url = args[0];
+    const isLatestRequested = args[1]?.toLowerCase() === 'latest';
+
     const { data: ytSetting, error: ytSettingError } = await supabase
       .from('yt_settings')
       .select('updates_channel_id')
@@ -118,8 +120,76 @@ async function execute(client, message, args, supabase) {
       };
     }
 
-    const url = args[0];
+    const updatesChannel = message.guild.channels.cache.get(ytSetting.updates_channel_id);
+    if (!updatesChannel || !updatesChannel.isTextBased()) {
+      return {
+        reply: {
+          embeds: [
+            cmdErrorEmbed(
+              'Invalid Channel',
+              '❌ The updates channel configured is not accessible or not a text channel.'
+            ),
+          ],
+        },
+      };
+    }
 
+    // Get the channelId
+    let channelId = extractChannelIdFromUrl(url);
+    if (!channelId) {
+      try {
+        const path = new URL(url).pathname;
+        const parts = path.split('/').filter(Boolean);
+        let candidate = parts[parts.length - 1];
+        if (candidate.startsWith('@')) candidate = candidate.slice(1);
+        channelId = await fetchChannelIdFromUsername(candidate);
+      } catch {
+        return {
+          reply: {
+            embeds: [
+              cmdErrorEmbed(
+                'Invalid YouTube URL',
+                '❌ Could not parse or resolve that YouTube channel URL.'
+              ),
+            ],
+          },
+        };
+      }
+    }
+
+    // If `latest` keyword is present
+    if (isLatestRequested) {
+      const latest = await fetchLatestVideo(channelId);
+      if (!latest) {
+        return {
+          reply: {
+            embeds: [
+              cmdErrorEmbed(
+                'No Videos Found',
+                '❌ No uploaded videos found for that channel.'
+              ),
+            ],
+          },
+        };
+      }
+
+      await updatesChannel.send(
+        `📢 New video uploaded on YouTube:\n**${latest.title}**\nhttps://youtu.be/${latest.id}`
+      );
+
+      return {
+        reply: {
+          embeds: [
+            cmdResponseEmbed(
+              'Latest Video Posted',
+              `✅ Latest video from ${url} posted to ${updatesChannel}.`
+            ),
+          ],
+        },
+      };
+    }
+
+    // If not `latest`, store in the database
     const { error } = await supabase
       .from('yt_channels')
       .upsert(
@@ -164,6 +234,7 @@ async function execute(client, message, args, supabase) {
       },
     };
   }
+
 
   // Invalid input
   return {
