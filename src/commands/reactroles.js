@@ -47,6 +47,56 @@ async function execute(client, message, args, supabase) {
     };
   }
 
+  // === Handle deletion mode ===
+  if (args.length >= 2 && /^\(\d+\)$/.test(args[0]) && args[1] === 'clear') {
+    const targetMessageId = args[0].replace(/[()]/g, '');
+
+    const { data: entry } = await supabase
+      .from('reaction_roles')
+      .select('*')
+      .eq('guild_id', message.guild.id)
+      .eq('message_id', targetMessageId)
+      .single();
+
+    if (!entry) {
+      return {
+        reply: {
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setTitle('❌ Not Found')
+              .setDescription('No such reaction role message exists for this message ID.'),
+          ],
+        },
+      };
+    }
+
+    const channel = await message.guild.channels.fetch(entry.channel_id).catch(() => null);
+    const oldMsg = channel ? await channel.messages.fetch(targetMessageId).catch(() => null) : null;
+    if (oldMsg) await oldMsg.delete().catch(() => null);
+
+    await supabase
+      .from('reaction_roles')
+      .delete()
+      .eq('guild_id', message.guild.id)
+      .eq('message_id', targetMessageId);
+
+    return {
+      reply: { content: `🗑️ Reaction role message \`${targetMessageId}\` deleted.` },
+      log: {
+        action: 'reactionrole_deleted',
+        executorUserId: message.author.id,
+        executorTag: message.author.tag,
+        guildId: message.guild.id,
+        channelId: entry.channel_id,
+        messageId: targetMessageId,
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+
+  // === Continue with creation mode ===
+
   if (args.length < 2) {
     return {
       reply: {
@@ -105,56 +155,6 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // === Handle deletion mode ===
-  if (args.length >= 3 && /^\d+$/.test(args[1]) && args[2] === 'clear') {
-    const targetMessageId = args[1];
-
-    const { data: entry } = await supabase
-      .from('reaction_roles')
-      .select('*')
-      .eq('guild_id', message.guild.id)
-      .eq('channel_id', channel.id)
-      .eq('message_id', targetMessageId)
-      .single();
-
-    if (!entry) {
-      return {
-        reply: {
-          embeds: [
-            new EmbedBuilder()
-              .setColor('Red')
-              .setTitle('❌ Not Found')
-              .setDescription('No such reaction role message exists for this message ID.'),
-          ],
-        },
-      };
-    }
-
-    const oldMsg = await channel.messages.fetch(targetMessageId).catch(() => null);
-    if (oldMsg) await oldMsg.delete().catch(() => null);
-
-    await supabase
-      .from('reaction_roles')
-      .delete()
-      .eq('guild_id', message.guild.id)
-      .eq('channel_id', channel.id)
-      .eq('message_id', targetMessageId);
-
-    return {
-      reply: { content: `🗑️ Reaction role message \`${targetMessageId}\` deleted.` },
-      log: {
-        action: 'reactionrole_deleted',
-        executorUserId: message.author.id,
-        executorTag: message.author.tag,
-        guildId: message.guild.id,
-        channelId: channel.id,
-        messageId: targetMessageId,
-        timestamp: new Date().toISOString(),
-      },
-    };
-  }
-
-  // === Continue with creation mode ===
   const argsStr = args.slice(1).join(' ');
 
   const messageText = parseParenArg(argsStr, 'msg');

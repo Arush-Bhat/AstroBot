@@ -9,7 +9,7 @@ const data = {
   description: 'Create or conclude polls using advanced syntax.',
   usage:
     '$polls #channel msg("Poll question") options((emoji:"Text"), ...) config(multiple=true/false)\n' +
-    '$polls #channel msgId("message_id") conclude',
+    '$polls message_id conclude',
 };
 
 async function execute(client, message, args, supabase) {
@@ -47,7 +47,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Utility parsing functions
+  // Utility functions
   function parseParenArg(str, key) {
     const regex = new RegExp(`${key}\\("([^"]+)"\\)`);
     const match = str.match(regex);
@@ -70,39 +70,10 @@ async function execute(client, message, args, supabase) {
     return { multiple: match ? match[1] === 'true' : true };
   }
 
-  // === Conclude Poll ===
-  if (args.length >= 3 && args[2].toLowerCase() === 'conclude') {
-    const channelMention = args[0];
-    const messageId = parseParenArg(args[1], 'msgId');
-
-    if (!messageId) {
-      return {
-        reply: {
-          embeds: [
-            new EmbedBuilder()
-              .setColor('Red')
-              .setTitle('❌ Invalid Syntax')
-              .setDescription('Missing or malformed `msgId`.\n\nExample: `msgId("123456789012345678")`'),
-          ],
-        },
-      };
-    }
-
-    const channelId = channelMention.replace(/[<#>]/g, '');
-    const channel = await message.guild.channels.fetch(channelId).catch(() => null);
-
-    if (!channel || !channel.isTextBased()) {
-      return {
-        reply: {
-          embeds: [
-            new EmbedBuilder()
-              .setColor('Red')
-              .setTitle('❌ Invalid Channel')
-              .setDescription('Make sure you mention a valid text channel. Example: `#polls`'),
-          ],
-        },
-      };
-    }
+  // === CONCLUDE POLL ===
+  const isConclude = args[1]?.toLowerCase?.() === 'conclude';
+  if (isConclude && /^\d{17,20}$/.test(args[0])) {
+    const messageId = args[0];
 
     const { data: pollData, error: pollError } = await supabase
       .from('polls')
@@ -124,6 +95,21 @@ async function execute(client, message, args, supabase) {
       };
     }
 
+    const channel = await message.guild.channels.fetch(pollData.channel_id).catch(() => null);
+
+    if (!channel || !channel.isTextBased()) {
+      return {
+        reply: {
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setTitle('❌ Invalid Channel')
+              .setDescription('Could not find the channel where the poll was created.'),
+          ],
+        },
+      };
+    }
+
     try {
       const pollMessage = await channel.messages.fetch(pollData.message_id);
       const reactions = pollMessage.reactions.cache;
@@ -139,7 +125,7 @@ async function execute(client, message, args, supabase) {
 
       const resultEmbed = new EmbedBuilder()
         .setTitle('📊 Poll Results')
-        .setDescription(pollData.title)
+        .setDescription(pollData.texts.question)
         .addFields({ name: 'Results', value: stats })
         .setFooter({ text: `Poll started at: ${new Date(pollData.created_at).toLocaleString()}` })
         .setColor('Blue');
@@ -159,7 +145,7 @@ async function execute(client, message, args, supabase) {
         },
         log: {
           action: 'concludePoll',
-          pollTitle: pollData.title,
+          pollTitle: pollData.texts.question,
           channelId: channel.id,
           messageId,
           concludedBy: message.author.id,
@@ -181,7 +167,7 @@ async function execute(client, message, args, supabase) {
     }
   }
 
-  // === Create Poll ===
+  // === CREATE POLL ===
   if (args.length < 3) {
     return {
       reply: {
@@ -269,10 +255,11 @@ async function execute(client, message, args, supabase) {
     guild_id: message.guild.id,
     channel_id: channel.id,
     message_id: pollMessage.id,
-    title: pollQuestion,
-    options,
-    is_multi: isMulti,
-    created_at: new Date().toISOString(),
+    texts: {
+      question: pollQuestion,
+      options: options.map((opt) => ({ emoji: opt.emoji, text: opt.text })),
+    },
+    multiple: isMulti,
   });
 
   return {
