@@ -15,6 +15,9 @@ export async function setupHandlers(client) {
       const event = await import(`./${file}`);
       const eventName = file.split('.')[0];
 
+      // Prevent duplicate listeners
+      client.removeAllListeners(eventName);
+
       if (typeof event.default !== 'function') {
         console.error(`❌ Event file "${file}" does not export a default function`);
         continue;
