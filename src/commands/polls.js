@@ -55,7 +55,8 @@ async function execute(client, message, args, supabase) {
   }
 
   function parseOptions(str) {
-    const regex = /(?:\(([^:]+):"([^"]+)"\))/g;
+    // Matches (emoji:"text") pairs, capturing emoji and text inside parentheses
+    const regex = /\(\s*([^:()]+)\s*:\s*"([^"]+)"\s*\)/g;
     const options = [];
     let match;
     while ((match = regex.exec(str)) !== null) {
