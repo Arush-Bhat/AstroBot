@@ -1,7 +1,6 @@
 import { EmbedBuilder } from 'discord.js';
 import supabase from '../supabaseClient.js';
 import { isModerator } from '../utils/permissions.js';
-import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 
 const permissionLevel = 'Mod';
 
@@ -47,9 +46,14 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // === Handle deletion mode ===
-  if (args.length >= 2 && /^\(\d+\)$/.test(args[0]) && args[1] === 'clear') {
-    const targetMessageId = args[0].replace(/[()]/g, '');
+  // === UPDATED: Handle deletion mode ===
+  // Accept raw message ID as first arg (digits only), second arg "clear"
+  if (
+    args.length >= 2 &&
+    /^\d{17,20}$/.test(args[0]) &&
+    args[1].toLowerCase() === 'clear'
+  ) {
+    const targetMessageId = args[0];
 
     const { data: entry } = await supabase
       .from('reaction_roles')
@@ -72,7 +76,20 @@ async function execute(client, message, args, supabase) {
     }
 
     const channel = await message.guild.channels.fetch(entry.channel_id).catch(() => null);
-    const oldMsg = channel ? await channel.messages.fetch(targetMessageId).catch(() => null) : null;
+    if (!channel || !channel.isTextBased()) {
+      return {
+        reply: {
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setTitle('❌ Invalid Channel')
+              .setDescription('Could not resolve the message’s channel.'),
+          ],
+        },
+      };
+    }
+
+    const oldMsg = await channel.messages.fetch(targetMessageId).catch(() => null);
     if (oldMsg) await oldMsg.delete().catch(() => null);
 
     await supabase
@@ -106,8 +123,8 @@ async function execute(client, message, args, supabase) {
             .setTitle('❌ Invalid Syntax')
             .setDescription(
               'Please provide all required arguments.\n\n' +
-              '**Example:**\n' +
-              '`$reactroles #channel msg("Choose a role:") roles((🔥:@role1), (❄️:@role2)) config(toggle=true)`'
+                '**Example:**\n' +
+                '`$reactroles #channel msg("Choose a role:") roles((🔥:@role1), (❄️:@role2)) config(toggle=true)`'
             ),
         ],
       },
@@ -181,7 +198,7 @@ async function execute(client, message, args, supabase) {
             .setTitle('❌ Missing Role Mappings')
             .setDescription(
               'You must specify at least one emoji-role pair.\n\n**Example:**\n' +
-              '`roles((🔥:@role1), (❄️:@role2))`'
+                '`roles((🔥:@role1), (❄️:@role2))`'
             ),
         ],
       },
