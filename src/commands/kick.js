@@ -118,7 +118,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  const reason = reasonMatch[1];
+  const reason_given = reasonMatch[1];
 
   // Check if target is server owner
   if (target.id === guild.ownerId) {
@@ -150,14 +150,14 @@ async function execute(client, message, args, supabase) {
   }
 
   try {
-    await target.kick(`Kicked by ${message.author.tag}: ${reason}`);
+    await target.kick(`Kicked by ${message.author.tag}: ${reason_given}`);
 
     return {
       reply: {
         embeds: [
           cmdResponseEmbed(
             'User Kicked',
-            `👢 Kicked ${target.user.tag} successfully.\n**Reason:** ${reason}`
+            `👢 Kicked ${target.user.tag} successfully.\n**Reason:** ${reason_given}`
           )
         ],
       },
@@ -168,7 +168,7 @@ async function execute(client, message, args, supabase) {
         executorUserId: message.author.id,
         executorTag: message.author.tag,
         guildId: guild.id,
-        reason,
+        reason: `${target.user.tag} kicked by ${message.author.tag} for ${reason_given}`,
         timestamp: new Date().toISOString(),
       },
     };
