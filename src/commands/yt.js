@@ -1,12 +1,17 @@
 import { cmdErrorEmbed, cmdResponseEmbed } from '../utils/embeds.js';
 import { isModerator } from '../utils/permissions.js';
+import {
+  extractChannelIdFromUrl,
+  fetchChannelIdFromUsername,
+  fetchLatestVideo
+} from '../utils/ytchecker.js';
 
 const permissionLevel = 'Mod';
 
 const data = {
   name: 'yt',
   description: 'Set YouTube updates channel or subscribe to YouTube channel URLs.',
-  usage: '$yt #channel OR $yt <YouTube URL>',
+  usage: '$yt #channel OR $yt <YouTube URL> OR $yt <YouTube URL> latest',
 };
 
 async function execute(client, message, args, supabase) {
@@ -38,19 +43,20 @@ async function execute(client, message, args, supabase) {
             '❌ You must provide either a channel mention or a YouTube channel URL.\n\n' +
             '**Usage:**\n' +
             '• `$yt #channel` → Set update channel\n' +
-            '• `$yt https://youtube.com/@channelname` → Subscribe to channel'
+            '• `$yt https://youtube.com/@channelname` → Subscribe to channel\n' +
+            '• `$yt https://youtube.com/@channelname latest` → Post latest video immediately'
           ),
         ],
       },
     };
   }
 
-  // Handle channel mention
   const channelMention = message.mentions.channels.first();
 
-  // Regex for YouTube channel URLs
+  // Regex to detect valid YouTube channel URLs
   const ytUrlPattern = /^https?:\/\/(www\.)?youtube\.com\/(channel\/[A-Za-z0-9_\-]{24}|c\/[A-Za-z0-9_\-]+|@[\w\-]+)(\/.*)?$/i;
 
+  // Handle updates channel setup
   if (channelMention) {
     const { error } = await supabase
       .from('yt_settings')
@@ -69,8 +75,7 @@ async function execute(client, message, args, supabase) {
           embeds: [
             cmdErrorEmbed(
               'Database Error',
-              '❌ Failed to set the YouTube updates channel.\n\n' +
-              'Please try again later or contact support.'
+              '❌ Failed to set the YouTube updates channel.\n\nPlease try again later or contact support.'
             ),
           ],
         },
@@ -96,7 +101,8 @@ async function execute(client, message, args, supabase) {
       },
     };
   }
-  
+
+  // Handle subscription or "latest" command
   if (ytUrlPattern.test(args[0])) {
     const url = args[0];
     const isLatestRequested = args[1]?.toLowerCase() === 'latest';
@@ -134,7 +140,7 @@ async function execute(client, message, args, supabase) {
       };
     }
 
-    // Get the channelId
+    // Get the YouTube channel ID
     let channelId = extractChannelIdFromUrl(url);
     if (!channelId) {
       try {
@@ -157,7 +163,7 @@ async function execute(client, message, args, supabase) {
       }
     }
 
-    // If `latest` keyword is present
+    // If `latest` keyword is provided, fetch and post latest video
     if (isLatestRequested) {
       const latest = await fetchLatestVideo(channelId);
       if (!latest) {
@@ -189,7 +195,7 @@ async function execute(client, message, args, supabase) {
       };
     }
 
-    // If not `latest`, store in the database
+    // Otherwise, save to database as a subscription
     const { error } = await supabase
       .from('yt_channels')
       .upsert(
@@ -207,8 +213,7 @@ async function execute(client, message, args, supabase) {
           embeds: [
             cmdErrorEmbed(
               'Database Error',
-              '❌ Failed to subscribe to YouTube channel.\n\n' +
-              'Check the URL format and try again.'
+              '❌ Failed to subscribe to YouTube channel.\n\nCheck the URL format and try again.'
             ),
           ],
         },
@@ -235,8 +240,7 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-
-  // Invalid input
+  // Invalid input fallback
   return {
     reply: {
       embeds: [
@@ -246,7 +250,8 @@ async function execute(client, message, args, supabase) {
           '**Expected:** A YouTube channel URL or a channel mention.\n\n' +
           '**Examples:**\n' +
           '• `$yt #yt-updates`\n' +
-          '• `$yt https://youtube.com/@astrochannel`'
+          '• `$yt https://youtube.com/@astrochannel`\n' +
+          '• `$yt https://youtube.com/@astrochannel latest`'
         ),
       ],
     },
