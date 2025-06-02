@@ -70,6 +70,23 @@ async function execute(client, message, args, supabase) {
       : 'No reason provided';
 
   try {
+    // Send DM before banning
+    const dmEmbed = {
+      title: 'You Have Been Banned',
+      description:
+        `You were banned from **${guild.name}** by **${message.author.tag}**.\n\n` +
+        `**Reason:** ${reason}\n**Message ID:** ${message.id}\n\n` +
+        `If you believe this was unfair, you may:\n` +
+        `📄 Fill this form: [Appeal Form](https://docs.google.com/forms/d/e/1FAIpQLSdDfwtITGNLKbCoHBPceEVEDwK6TtK6I3ANlm7sly9UO1ddoQ/viewform?usp=dialog)\n\n` +
+        `Provide the server name, your user ID (**${target.id}**), the message ID (**${message.id}**), your real name, and any relevant proof.\n\n` +
+        `⚠️ Directly contacting administrators is allowed, but trolling or spamming will result in losing your right to appeal.`,
+      color: 0xff0000
+    };
+
+    await target.send({ embeds: [dmEmbed] }).catch(() => {
+      console.warn(`Could not DM ${target.user.tag} before banning.`);
+    });
+
     await target.ban({ reason: `Banned by ${message.author.tag}: ${reason}` });
 
     // Log to Supabase banned_users table

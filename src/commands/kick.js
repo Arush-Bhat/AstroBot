@@ -150,6 +150,24 @@ async function execute(client, message, args, supabase) {
   }
 
   try {
+    // Send DM before kicking
+    const dmEmbed = {
+      title: 'You Have Been Kicked',
+      description:
+        `You were kicked from **${guild.name}** by **${message.author.tag}**.\n\n` +
+        `**Reason:** ${reason_given}\n**Message ID:** ${message.id}\n\n` +
+        `You may rejoin the server, but note that this is considered a warning.\n\n` +
+        `If you believe this was unfair:\n` +
+        `📄 Fill this form: [Appeal Form](https://docs.google.com/forms/d/e/1FAIpQLSdDfwtITGNLKbCoHBPceEVEDwK6TtK6I3ANlm7sly9UO1ddoQ/viewform?usp=dialog)\n\n` +
+        `Include the server name, your user ID (**${target.id}**), the message ID (**${message.id}**), your real name, and any relevant proof.\n\n` +
+        `⚠️ Directly contacting administrators is allowed, but trolling or spamming will result in losing your right to appeal.`,
+      color: 0xffa500
+    };
+
+    await target.send({ embeds: [dmEmbed] }).catch(() => {
+      console.warn(`Could not DM ${target.user.tag} before kicking.`);
+    });
+
     await target.kick(`Kicked by ${message.author.tag}: ${reason_given}`);
 
     return {
