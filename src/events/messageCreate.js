@@ -116,6 +116,9 @@ export default async function messageCreate(message, client) {
       const userMentionMatch = args[0]?.match(/^<@!?(\d+)>$/);
       const targetUserId = userMentionMatch?.[1] ?? null;
 
+      // Use reason if the command returned it, else default to 'N/A'
+      const reason = result?.log?.reason ?? 'N/A';
+
       await logCommand({
         client,
         supabase,
