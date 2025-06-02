@@ -124,11 +124,14 @@ async function execute(client, message, args, supabase) {
       const sorted = results.sort((a, b) => b.count - a.count);
       const stats = sorted.map((r) => `${r.emoji}: ${r.count}`).join('\n') || 'No votes received.';
 
+      // Fix for invalid Date: use pollData.created_at if valid, else fallback to current date
+      const createdAt = pollData.created_at ? new Date(pollData.created_at) : new Date();
+
       const resultEmbed = new EmbedBuilder()
         .setTitle('📊 Poll Results')
         .setDescription(pollData.texts.question)
         .addFields({ name: 'Results', value: stats })
-        .setFooter({ text: `Poll started at: ${new Date(pollData.created_at).toLocaleString()}` })
+        .setFooter({ text: `Poll started at: ${createdAt.toLocaleString()}` })
         .setColor('Blue');
 
       await pollMessage.delete();
@@ -150,7 +153,8 @@ async function execute(client, message, args, supabase) {
           channelId: channel.id,
           messageId,
           concludedBy: message.author.id,
-          reason: `Poll message concluded by ${message.author.tag} using $reactroles ${targetMessageId} clear.`,
+          // Removed reference to undefined targetMessageId; replaced with messageId for clarity
+          reason: `Poll message deleted by ${message.author.tag} using $polls ${messageId} conclude.`,
           timestamp: new Date().toISOString(),
         },
       };
