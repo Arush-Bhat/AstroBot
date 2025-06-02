@@ -150,6 +150,7 @@ async function execute(client, message, args, supabase) {
           channelId: channel.id,
           messageId,
           concludedBy: message.author.id,
+          reason: `Poll message concluded by ${message.author.tag} using $reactroles ${targetMessageId} clear.`,
           timestamp: new Date().toISOString(),
         },
       };
@@ -273,6 +274,7 @@ async function execute(client, message, args, supabase) {
       options,
       isMulti,
       createdBy: message.author.id,
+      reason: `Poll message created by ${message.author.tag} in #${channel.name}.`,
       timestamp: new Date().toISOString(),
     },
   };

@@ -34,6 +34,18 @@ async function execute(client, message, args, supabase) {
     .setTitle('🔧 Prefix Updated');
 
   await message.channel.send({ embeds: [embed] });
+  
+    return {
+    log: {
+        action: 'prefix_updated',
+        executorUserId: message.author.id,
+        executorTag: message.author.tag,
+        guildId: message.guild.id,
+        newPrefix: newPrefix,
+        reason: `Command prefix changed to "${newPrefix}" by ${message.author.tag}`,
+        timestamp: new Date().toISOString(),
+    },
+    };
 }
 
 export default {

@@ -107,6 +107,7 @@ async function execute(client, message, args, supabase) {
         guildId: message.guild.id,
         channelId: entry.channel_id,
         messageId: targetMessageId,
+        reason: `Reaction role message deleted by ${message.author.tag} using $reactroles ${targetMessageId} clear.`,
         timestamp: new Date().toISOString(),
       },
     };
@@ -271,6 +272,7 @@ async function execute(client, message, args, supabase) {
       messageId: post.id,
       mappings: JSON.stringify(mappings),
       togglable: togglable.toString(),
+      reason: `Reaction role message created by ${message.author.tag} in #${channel.name}.`,
       timestamp: new Date().toISOString(),
     },
   };

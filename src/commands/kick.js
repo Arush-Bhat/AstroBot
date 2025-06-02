@@ -5,7 +5,7 @@ const permissionLevel = 'Mod';
 const data = {
   name: 'kick',
   description: 'Kick a user from the server. Moderator-level command.',
-  usage: '$kick @user',
+  usage: '$kick @user "Reason inside quotes"',
 };
 
 async function execute(client, message, args, supabase) {
@@ -70,13 +70,15 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  if (args.length < 1) {
+  // Must have at least 2 args: @user and "reason"
+  if (args.length < 2) {
     return {
       reply: {
         embeds: [
           cmdErrorEmbed(
             'Invalid Usage',
-            '❌ Please mention a user to kick.\n\nExample usage: `$kick @user`'
+            '❌ You must mention a user and provide a reason in quotes.\n\n' +
+            'Example usage: `$kick @user \"Spamming in channels\"`'
           )
         ],
       },
@@ -91,12 +93,32 @@ async function execute(client, message, args, supabase) {
         embeds: [
           cmdErrorEmbed(
             'Invalid User',
-            '❌ Please mention a valid user to kick.\n\nExample usage: `$kick @user`'
+            '❌ Please mention a valid user to kick.\n\nExample usage: `$kick @user \"Reason here\"`'
           )
         ],
       },
     };
   }
+
+  // Extract reason — everything after the mention as a quoted string
+  // Join args after mention and match quoted text
+  const argsStr = message.content.split(' ').slice(2).join(' ').trim();
+  const reasonMatch = argsStr.match(/^"(.+)"$/);
+
+  if (!reasonMatch) {
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Missing Reason',
+            '❌ You must provide a reason inside quotes.\n\nExample usage: `$kick @user \"Spamming in channels\"`'
+          )
+        ],
+      },
+    };
+  }
+
+  const reason = reasonMatch[1];
 
   // Check if target is server owner
   if (target.id === guild.ownerId) {
@@ -128,15 +150,14 @@ async function execute(client, message, args, supabase) {
   }
 
   try {
-    await target.kick(`Kicked by ${message.author.tag}`);
+    await target.kick(`Kicked by ${message.author.tag}: ${reason}`);
 
-    // Return success reply and data for logCommand
     return {
       reply: {
         embeds: [
           cmdResponseEmbed(
             'User Kicked',
-            `👢 Kicked ${target.user.tag} successfully.`
+            `👢 Kicked ${target.user.tag} successfully.\n**Reason:** ${reason}`
           )
         ],
       },
@@ -147,7 +168,7 @@ async function execute(client, message, args, supabase) {
         executorUserId: message.author.id,
         executorTag: message.author.tag,
         guildId: guild.id,
-        reason: `Kicked by ${message.author.tag}`,
+        reason,
         timestamp: new Date().toISOString(),
       },
     };
