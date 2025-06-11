@@ -138,14 +138,41 @@ async function execute(client, message, args, supabase) {
   }
 
   // Check if the guild_settings row exists to decide between update or insert
-  const { data: existing, error: fetchError } = await supabase
+  let { data: existing, error: fetchError } = await supabase
     .from('guild_settings')
     .select('guild_id')
     .eq('guild_id', guildId)
     .single();
 
-  // If the error is not "row not found", return a database error
-  if (fetchError && fetchError.code !== 'PGRST116') {
+  if (fetchError && fetchError.code === 'PGRST116') {
+    // Row not found – insert with default prefix
+    const { error: createError } = await supabase
+      .from('guild_settings')
+      .insert({ guild_id: guildId, prefix: '$' });
+
+    if (createError) {
+      console.error(createError);
+      return {
+        reply: {
+          embeds: [
+            cmdErrorEmbed(
+              'Database Error',
+              '❌ Failed to initialize server settings. Please try again later.'
+            ),
+          ],
+        },
+      };
+    }
+
+    // Re-fetch the row to proceed
+    const result = await supabase
+      .from('guild_settings')
+      .select('guild_id')
+      .eq('guild_id', guildId)
+      .single();
+    existing = result.data;
+    fetchError = result.error;
+  } else if (fetchError) {
     console.error(fetchError);
     return {
       reply: {
@@ -160,44 +187,23 @@ async function execute(client, message, args, supabase) {
   }
 
   // Update existing row with new modch channel ID
-  if (existing) {
-    const { error: updateError } = await supabase
-      .from('guild_settings')
-      .update({ modch_channel_id: channelId })
-      .eq('guild_id', guildId);
+  const { error: updateError } = await supabase
+    .from('guild_settings')
+    .update({ modch_channel_id: channelId })
+    .eq('guild_id', guildId);
 
-    if (updateError) {
-      console.error(updateError);
-      return {
-        reply: {
-          embeds: [
-            cmdErrorEmbed(
-              'Database Error',
-              '❌ Failed to update mod commands channel. Please try again later.'
-            ),
-          ],
-        },
-      };
-    }
-  } else {
-    // Insert new row if no previous settings were found
-    const { error: insertError } = await supabase
-      .from('guild_settings')
-      .insert({ guild_id: guildId, modch_channel_id: channelId });
-
-    if (insertError) {
-      console.error(insertError);
-      return {
-        reply: {
-          embeds: [
-            cmdErrorEmbed(
-              'Database Error',
-              '❌ Failed to insert mod commands channel. Please try again later.'
-            ),
-          ],
-        },
-      };
-    }
+  if (updateError) {
+    console.error(updateError);
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Database Error',
+            '❌ Failed to update mod commands channel. Please try again later.'
+          ),
+        ],
+      },
+    };
   }
 
   // Success: return confirmation and log the action

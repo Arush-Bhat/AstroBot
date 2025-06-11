@@ -10,7 +10,7 @@ const data = {
   usage: '$setmod @role',
 };
 
-async function execute(client, message, args, supabase) {
+async function execute(client, message, args) { // ❌ removed `supabase` here
   console.log('✅ Command setmod.js executed with args:', args);
   const guildId = message.guild.id;
 
@@ -45,26 +45,64 @@ async function execute(client, message, args, supabase) {
     };
   }
 
-  // Save the moderator role ID to the `guild_settings` table in Supabase
-  const { error } = await supabase
+  // Check if guild_settings row exists
+  let { data: existing, error: fetchError } = await supabase
     .from('guild_settings')
-    .upsert({ guild_id: guildId, mod_role_id: role.id })
-    .eq('guild_id', guildId); // Ensure only one entry per guild
+    .select('guild_id')
+    .eq('guild_id', guildId)
+    .single();
 
-  // Handle database error
-  if (error) {
-    console.error(error);
+  if (fetchError && fetchError.code === 'PGRST116') {
+    // No row found, insert default with $ prefix and mod_role_id
+    const { error: insertError } = await supabase
+      .from('guild_settings')
+      .insert({ guild_id: guildId, prefix: '$', mod_role_id: role.id });
+
+    if (insertError) {
+      console.error(insertError);
+      return {
+        reply: {
+          embeds: [
+            cmdErrorEmbed(
+              'Database Error',
+              '❌ Failed to initialize guild settings.\n\nPlease try again later.'
+            ),
+          ],
+        },
+      };
+    }
+  } else if (fetchError) {
+    console.error(fetchError);
     return {
       reply: {
         embeds: [
           cmdErrorEmbed(
             'Database Error',
-            '❌ Failed to save the moderator role in the database.\n\n' +
-            'Please try again later or contact a developer if the problem persists.'
+            '❌ Failed to fetch guild settings.\n\nPlease try again later.'
           ),
         ],
       },
     };
+  } else {
+    // Row exists, update mod_role_id
+    const { error: updateError } = await supabase
+      .from('guild_settings')
+      .update({ mod_role_id: role.id })
+      .eq('guild_id', guildId);
+
+    if (updateError) {
+      console.error(updateError);
+      return {
+        reply: {
+          embeds: [
+            cmdErrorEmbed(
+              'Database Error',
+              '❌ Failed to update the moderator role in the database.\n\nPlease try again later.'
+            ),
+          ],
+        },
+      };
+    }
   }
 
   // Respond with a success embed and include logging metadata

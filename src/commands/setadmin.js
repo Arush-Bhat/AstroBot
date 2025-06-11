@@ -47,26 +47,64 @@ async function execute(client, message, args, supabase) {
 
   const guildId = message.guild.id;
 
-  // Save the admin role ID to Supabase for this guild
-  const { error } = await supabase
+  // Check if the guild_settings row exists
+  let { data: existing, error: fetchError } = await supabase
     .from('guild_settings')
-    .upsert({ guild_id: guildId, admin_role_id: role.id }) // Insert or update the admin role
-    .eq('guild_id', guildId); // Ensure update is scoped to the current guild
+    .select('guild_id')
+    .eq('guild_id', guildId)
+    .single();
 
-  // Handle any Supabase errors
-  if (error) {
-    console.error(error);
+  if (fetchError && fetchError.code === 'PGRST116') {
+    // No row found, insert default with $ prefix and admin role
+    const { error: insertError } = await supabase
+      .from('guild_settings')
+      .insert({ guild_id: guildId, prefix: '$', admin_role_id: role.id });
+
+    if (insertError) {
+      console.error(insertError);
+      return {
+        reply: {
+          embeds: [
+            cmdErrorEmbed(
+              'Database Error',
+              '❌ Failed to initialize guild settings.\n\nPlease try again later.'
+            ),
+          ],
+        },
+      };
+    }
+  } else if (fetchError) {
+    console.error(fetchError);
     return {
       reply: {
         embeds: [
           cmdErrorEmbed(
             'Database Error',
-            '❌ Failed to save the admin role to the database.\n\n' +
-            'Please try again later or contact a bot developer.'
-          )
+            '❌ Failed to fetch guild settings.\n\nPlease try again later.'
+          ),
         ],
       },
     };
+  } else {
+    // Row exists, update admin_role_id
+    const { error: updateError } = await supabase
+      .from('guild_settings')
+      .update({ admin_role_id: role.id })
+      .eq('guild_id', guildId);
+
+    if (updateError) {
+      console.error(updateError);
+      return {
+        reply: {
+          embeds: [
+            cmdErrorEmbed(
+              'Database Error',
+              '❌ Failed to update the admin role in the database.\n\nPlease try again later.'
+            ),
+          ],
+        },
+      };
+    }
   }
 
   // Send a confirmation message and log the change

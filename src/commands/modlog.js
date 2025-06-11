@@ -140,14 +140,41 @@ async function execute(client, message, args, supabase) {
   }
 
   // Check if guild settings already exist in the database
-  const { data: existing, error: fetchError } = await supabase
+  let { data: existing, error: fetchError } = await supabase
     .from('guild_settings')
     .select('guild_id')
     .eq('guild_id', guildId)
     .single();
 
-  // If error other than "no rows", return a database error
-  if (fetchError && fetchError.code !== 'PGRST116') {
+  if (fetchError && fetchError.code === 'PGRST116') {
+    // No row found, insert default row with $ prefix
+    const { error: createError } = await supabase
+      .from('guild_settings')
+      .insert({ guild_id: guildId, prefix: '$' });
+
+    if (createError) {
+      console.error(createError);
+      return {
+        reply: {
+          embeds: [
+            cmdErrorEmbed(
+              'Database Error',
+              '❌ Failed to initialize guild settings.\n\nPlease try again later.'
+            ),
+          ],
+        },
+      };
+    }
+
+    // Re-fetch to proceed with update
+    const result = await supabase
+      .from('guild_settings')
+      .select('guild_id')
+      .eq('guild_id', guildId)
+      .single();
+    existing = result.data;
+    fetchError = result.error;
+  } else if (fetchError) {
     console.error(fetchError);
     return {
       reply: {
@@ -156,50 +183,29 @@ async function execute(client, message, args, supabase) {
             'Database Error',
             '❌ Error while fetching guild settings.\n\nPlease try again later.'
           ),
-        ],        
+        ],
       },
     };
   }
 
-  // If record exists, update the modlog channel
-  if (existing) {
-    const { error: updateError } = await supabase
-      .from('guild_settings')
-      .update({ modlog_channel_id: channelId })
-      .eq('guild_id', guildId);
+  // Now safe to update the modlog channel
+  const { error: updateError } = await supabase
+    .from('guild_settings')
+    .update({ modlog_channel_id: channelId })
+    .eq('guild_id', guildId);
 
-    if (updateError) {
-      console.error(updateError);
-      return {
-        reply: {
-          embeds: [
-            cmdErrorEmbed(
-              'Database Error',
-              '❌ Failed to update the modlog channel.\n\nPlease try again later.'
-            ),
-          ],          
-        },
-      };
-    }
-  } else {
-    // If no record exists, insert a new one with the modlog channel
-    const { error: insertError } = await supabase
-      .from('guild_settings')
-      .insert({ guild_id: guildId, modlog_channel_id: channelId });
-
-    if (insertError) {
-      console.error(insertError);
-      return {
-        reply: {
-          embeds: [
-            cmdErrorEmbed(
-              'Database Error',
-              '❌ Failed to insert the modlog channel.\n\nPlease try again later.'
-            ),
-          ],          
-        },
-      };
-    }
+  if (updateError) {
+    console.error(updateError);
+    return {
+      reply: {
+        embeds: [
+          cmdErrorEmbed(
+            'Database Error',
+            '❌ Failed to update the modlog channel.\n\nPlease try again later.'
+          ),
+        ],
+      },
+    };
   }
 
   // Successfully set the modlog channel
@@ -212,7 +218,6 @@ async function execute(client, message, args, supabase) {
         ),
       ],
     },
-    // Log object for internal use or audit purposes
     log: {
       action: 'modlog_set',
       executorUserId: message.author.id,
